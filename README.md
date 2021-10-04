@@ -14,7 +14,7 @@ This repository contains the code used for the [paper](https://arxiv.org/abs/210
 **Disclaimer**: the results of the paper were obtained with python 3.6 and a Linux (centOS) operating system. Reproducibility for different configurations is not guaranteed.
 
 ### Data
-You can download the dataset used for this study from this [OpenNEURO link](https://openneuro.org/datasets/ds003821/versions/1.0.0)
+You can download the dataset used for this study from this [OpenNEURO link](https://openneuro.org/datasets/ds003821/versions/1.0.0).
 
 ### Setup conda environment
 1) Clone the repository
