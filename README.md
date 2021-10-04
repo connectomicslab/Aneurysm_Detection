@@ -18,7 +18,7 @@ You can download the dataset used for this study from this [OpenNEURO link](http
 
 ### Setup conda environment
 1) Clone the repository
-2) Create a conda environment using the `environment.yml` file located inside the `install` directory. Feel free to use your favorite IDE such as [PyCharm](https://www.jetbrains.com/pycharm/download/#section=linux) or [Visual Studio](https://visualstudio.microsoft.com/downloads/).
+2) Create a conda environment using the `environment.yml` file located inside the `install` directory. Feel free to use your favorite [IDE](https://en.wikipedia.org/wiki/Integrated_development_environment) such as [PyCharm](https://www.jetbrains.com/pycharm/download/#section=linux) or [Visual Studio](https://visualstudio.microsoft.com/downloads/).
 
 ## Usage
 ### 1) Creation of training dataset
