@@ -1,7 +1,7 @@
 """
 Created on Apr 6, 2021
 
-Utility scripts for aneurysm detection pipeline.
+Utility scripts for patch dataset creation from BIDS dataset.
 
 """
 
