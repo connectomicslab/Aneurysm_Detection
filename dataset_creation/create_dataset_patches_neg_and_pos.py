@@ -19,7 +19,8 @@ import sys
 import getpass
 from dataset_creation.utils_dataset_creation import load_resampled_vol_and_boundaries, resample_volume, extract_lesion_info_modified, print_running_time, \
     nb_last_created_patch, extract_vessel_like_neg_patches, extract_random_neg_patches, extract_neg_landmark_patches, load_nifti_and_resample, \
-    randomly_translate_coordinates, extract_thresholds_of_intensity_criteria, refine_weak_label_one_sub, load_pickle_list_from_disk, weakify_voxelwise_label_one_sub
+    randomly_translate_coordinates, extract_thresholds_of_intensity_criteria, refine_weak_label_one_sub, load_pickle_list_from_disk, \
+    weakify_voxelwise_label_one_sub, load_config_file, str2bool
 
 
 __author__ = "Tommaso Di Noto"
@@ -503,34 +504,29 @@ def create_patch_ds(bids_dataset_path, mni_landmark_points_path, out_dataset_pat
 def main():
     start = time.time()  # start timer; used to compute the time needed to run this script
     # ---------------------------------------------------------------------------------------------
+    # the code inside here is run only when THIS script is run, and not just imported
+    config_dict = load_config_file(parser_name='dataset_creation')  # load input config file with argparser
 
-    on_hpc_cluster = getpass.getuser() in ['to5743']  # type: bool # check if user is in list of authorized users
-    if on_hpc_cluster:  # if we are running on the HPC
-        bids_dataset_path = sys.argv[1]
-        mni_landmark_points_path = sys.argv[2]
-        out_dataset_path = sys.argv[3]
-        subs_chuv_with_weak_labels_path = sys.argv[4]
-        subs_chuv_with_voxelwise_labels_path = sys.argv[5]
-        jobs_in_parallel = -1  # nb. jobs to run in parallel (i.e. number of CPU (cores) to use); if set to -1, all available CPUs are used
-    else:  # if instead we want to run locally
-        bids_dataset_path = "/media/newuser/7EF9B56B27259371/Aneurysm_Data_Set/35-BIDS_Aneurysm_dataset_May_27_2021/"
-        mni_landmark_points_path = "/home/newuser/Desktop/MNI_Registration_Aneurysms_Dataset/Anatomical_Landmarks/Landmarks_LPS_mm_Dec_05_2020.csv"
-        out_dataset_path = "/home/newuser/Desktop/Data_Set_Patches/"
-        subs_chuv_with_weak_labels_path = "/home/newuser/Desktop/MICCAI_Aneurysms/patients_with_weak_labels.pkl"
-        subs_chuv_with_voxelwise_labels_path = "/home/newuser/Desktop/MICCAI_Aneurysms/patients_with_voxelwise_labels.pkl"
-        jobs_in_parallel = 1  # nb. jobs to run in parallel (i.e. number of CPU (cores) to use); if set to -1, all available CPUs are used
+    # extract input args
+    bids_dataset_path = config_dict['bids_dataset_path']  # type: str # path to BIDS dataset (available on OpenNEURO)
+    patch_side = config_dict['patch_side']  # type: int # size of training patches
+    desired_spacing = config_dict['desired_spacing']  # type: list # voxel spacing used for resampling (we resample all volumes to this spacing)
+    overlapping = config_dict['overlapping']  # type: float # amount of overlapping between patches in sliding-window approach
+    mni_landmark_points_path = config_dict['mni_landmark_points_path']  # type: str # path to file containining landmark points coordinates in physical space
+    out_dataset_path = config_dict['out_dataset_path']  # type: str # path to output dataset
+    subs_chuv_with_weak_labels_path = config_dict['subs_chuv_with_weak_labels_path']  # type: str # path to pickle file containin the subjects with weak labels
+    subs_chuv_with_voxelwise_labels_path = config_dict['subs_chuv_with_voxelwise_labels_path']  # type: str  # path to pickle file containin the subjects with weak labels
+    jobs_in_parallel = config_dict['jobs_in_parallel']  # type: int # nb. jobs to run in parallel (i.e. number of CPU (cores) to use); if set to -1, all available CPUs are used
 
-    patch_side = 64  # type: int
-    desired_spacing = [0.39, 0.39, 0.55]  # type: list
-    overlapping = 0.25  # type: float # amount of overlapping between patches in sliding-window approach
     # ARGS for negative patches
-    vessel_like_neg_patches = 20
-    random_neg_patches = 10
-    landmark_patches = True
+    vessel_like_neg_patches = config_dict['vessel_like_neg_patches']  # type: int # number of vessel-like negative patches to extract
+    random_neg_patches = config_dict['random_neg_patches']  # type: int # number of random negative patches to extract
+    landmark_patches = str2bool(config_dict['landmark_patches'])  # type: bool # whether to extract patches in correspondence of landmark points or not
+
     # ARGS for positive patches
-    pos_patches = 8
-    refine_weak_labels = True
-    convert_voxelwise_labels_into_weak = False
+    pos_patches = config_dict['pos_patches']  # type: int # number of positive patches to extract for each aneurysm
+    refine_weak_labels = str2bool(config_dict['refine_weak_labels'])  # type: bool # whether to refine weak labels or not
+    convert_voxelwise_labels_into_weak = str2bool(config_dict['convert_voxelwise_labels_into_weak'])  # type: bool #  whether to weakify the voxelwise labels or not
 
     create_patch_ds(bids_dataset_path,
                     mni_landmark_points_path,
