@@ -1,4 +1,9 @@
-"""Utility scripts for aneurysm detection pipeline."""
+"""
+Created on Apr 6, 2021
+
+Utility scripts for aneurysm detection pipeline.
+
+"""
 
 import numpy as np
 import SimpleITK as sitk
@@ -18,6 +23,14 @@ from joblib import Parallel, delayed
 import shutil
 import pickle
 from typing import List
+import argparse
+import json
+
+
+__author__ = "Tommaso Di Noto"
+__version__ = "0.0.1"
+__email__ = "Tommaso.Di-Noto@chuv.ch"
+__status__ = "Prototype"
 
 
 def round_half_up(n, decimals=0):
