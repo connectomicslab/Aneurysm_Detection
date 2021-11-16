@@ -504,7 +504,7 @@ def main():
     start = time.time()  # start timer; used to compute the time needed to run this script
     # ---------------------------------------------------------------------------------------------
     # the code inside here is run only when THIS script is run, and not just imported
-    config_dict = load_config_file(parser_name='dataset_creation')  # load input config file with argparser
+    config_dict = load_config_file()  # load input config file with argparser
 
     # extract input args
     bids_dataset_path = config_dict['bids_dataset_path']  # type: str # path to BIDS dataset (available on OpenNEURO)
