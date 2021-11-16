@@ -15,12 +15,11 @@ import random
 from random import randrange
 import numpy as np
 import nibabel as nib
-import sys
-import getpass
 from dataset_creation.utils_dataset_creation import load_resampled_vol_and_boundaries, resample_volume, extract_lesion_info_modified, print_running_time, \
     nb_last_created_patch, extract_vessel_like_neg_patches, extract_random_neg_patches, extract_neg_landmark_patches, load_nifti_and_resample, \
     randomly_translate_coordinates, extract_thresholds_of_intensity_criteria, refine_weak_label_one_sub, load_pickle_list_from_disk, \
-    weakify_voxelwise_label_one_sub, load_config_file, str2bool
+    weakify_voxelwise_label_one_sub
+from inference.utils_inference import load_config_file, str2bool
 
 
 __author__ = "Tommaso Di Noto"
