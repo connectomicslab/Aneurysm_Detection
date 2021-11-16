@@ -1,7 +1,7 @@
 """
 Created on Apr 6, 2021
 
-This script loops through the input BIDS dataset and creates a subdataset of patches. For controls (subject without aneurysms), only negative patches
+This script loops through the input BIDS dataset and creates a sub-dataset of patches. For controls (subject without aneurysms), only negative patches
 are extracted. For patients (subjects with aneurysm(s)), both negative (without aneurysm) and positive (with aneurysm) patches are extracted.
 
 """
@@ -20,6 +20,12 @@ import getpass
 from dataset_creation.utils_dataset_creation import load_resampled_vol_and_boundaries, resample_volume, extract_lesion_info_modified, print_running_time, \
     nb_last_created_patch, extract_vessel_like_neg_patches, extract_random_neg_patches, extract_neg_landmark_patches, load_nifti_and_resample, \
     randomly_translate_coordinates, extract_thresholds_of_intensity_criteria, refine_weak_label_one_sub, load_pickle_list_from_disk, weakify_voxelwise_label_one_sub
+
+
+__author__ = "Tommaso Di Noto"
+__version__ = "0.0.1"
+__email__ = "Tommaso.Di-Noto@chuv.ch"
+__status__ = "Prototype"
 
 
 def extract_negative_patches(subdir, n4bfc_bet_angio_path, bids_dataset_path, desired_spacing, out_dataset_path, mni_landmark_points_path, intensity_thresholds,
@@ -46,7 +52,7 @@ def extract_negative_patches(subdir, n4bfc_bet_angio_path, bids_dataset_path, de
         AssertionError: if mni_landmark_points_path does not exist
         AssertionError: if the extension of the files containing the landmark points is not correct
     """
-    assert os.path.exists(bids_dataset_path), "Path {0} does not exist".format(bids_dataset_path)  # make sure that path exists
+    assert os.path.exists(bids_dataset_path), "Path {} does not exist".format(bids_dataset_path)  # make sure that path exists
 
     if not os.path.exists(out_dataset_path):  # if folder doesn't exist
         os.makedirs(out_dataset_path)  # create data_set folder with today's date in the filename
@@ -54,10 +60,10 @@ def extract_negative_patches(subdir, n4bfc_bet_angio_path, bids_dataset_path, de
 
     neg_patches_path = os.path.join(out_dataset_path, "Negative_Patches")  # type: str # create path of folder that will contain the negative patches
     vessel_mni_registration_dir = os.path.join(bids_dataset_path, "derivatives/registrations/vesselMNI_2_angioTOF/")  # type: str
-    assert os.path.exists(vessel_mni_registration_dir), "Path {0} does not exist".format(vessel_mni_registration_dir)  # make sure that path exists
+    assert os.path.exists(vessel_mni_registration_dir), "Path {} does not exist".format(vessel_mni_registration_dir)  # make sure that path exists
     registrations_dir = os.path.join(bids_dataset_path, "derivatives/registrations/reg_params/")
-    assert os.path.exists(registrations_dir), "Path {0} does not exist".format(registrations_dir)  # make sure that path exists
-    assert os.path.exists(mni_landmark_points_path), "Path {0} does not exist".format(mni_landmark_points_path)
+    assert os.path.exists(registrations_dir), "Path {} does not exist".format(registrations_dir)  # make sure that path exists
+    assert os.path.exists(mni_landmark_points_path), "Path {} does not exist".format(mni_landmark_points_path)
     _, ext_ = os.path.splitext(mni_landmark_points_path)  # extract extension
     assert ext_ == ".csv", "File containing landmark points must have .csv extension"
 
@@ -72,28 +78,28 @@ def extract_negative_patches(subdir, n4bfc_bet_angio_path, bids_dataset_path, de
 
     # save path of original angio path before BET
     if "ADAM" in subdir:
-        original_angio_volume_path = os.path.join(bids_dataset_path, sub, ses, "anat", "{0}_{1}_angio_ADAM.nii.gz".format(sub, ses))
+        original_angio_volume_path = os.path.join(bids_dataset_path, sub, ses, "anat", "{}_{}_angio_ADAM.nii.gz".format(sub, ses))
     else:
-        original_angio_volume_path = os.path.join(bids_dataset_path, sub, ses, "anat", "{0}_{1}_angio.nii.gz".format(sub, ses))
+        original_angio_volume_path = os.path.join(bids_dataset_path, sub, ses, "anat", "{}_{}_angio.nii.gz".format(sub, ses))
     assert os.path.exists(original_angio_volume_path), "Path {} does not exist".format(original_angio_volume_path)
 
     # save path of corresponding vesselMNI co-registered volume
     if "ADAM" in subdir:
-        vessel_mni_reg_volume_path = os.path.join(vessel_mni_registration_dir, sub, ses, "anat", "{0}_{1}_desc-vesselMNI2angio_deformed_ADAM.nii.gz".format(sub, ses))
+        vessel_mni_reg_volume_path = os.path.join(vessel_mni_registration_dir, sub, ses, "anat", "{}_{}_desc-vesselMNI2angio_deformed_ADAM.nii.gz".format(sub, ses))
     else:
-        vessel_mni_reg_volume_path = os.path.join(vessel_mni_registration_dir, sub, ses, "anat", "{0}_{1}_desc-vesselMNI2angio_deformed.nii.gz".format(sub, ses))
+        vessel_mni_reg_volume_path = os.path.join(vessel_mni_registration_dir, sub, ses, "anat", "{}_{}_desc-vesselMNI2angio_deformed.nii.gz".format(sub, ses))
     assert os.path.exists(vessel_mni_reg_volume_path), "Path {} does not exist".format(vessel_mni_reg_volume_path)
 
     # resample N4bfc angio to new spacing
     resampled_bfc_tof_volume, resampled_bfc_tof_aff_mat, resampled_bfc_tof_volume_sitk, angio_min_x, angio_max_x, \
-    angio_min_y, angio_max_y, angio_min_z, angio_max_z = load_resampled_vol_and_boundaries(os.path.join(subdir, n4bfc_bet_angio_path),
-                                                                                           desired_spacing,
-                                                                                           tmp_folder,
-                                                                                           sub,
-                                                                                           ses)
+        angio_min_y, angio_max_y, angio_min_z, angio_max_z = load_resampled_vol_and_boundaries(os.path.join(subdir, n4bfc_bet_angio_path),
+                                                                                               desired_spacing,
+                                                                                               tmp_folder,
+                                                                                               sub,
+                                                                                               ses)
 
     # Load corresponding vesselMNI volume and resample to new spacing
-    out_path = os.path.join(tmp_folder, "{0}_{1}_resampled_vessel_atlas.nii.gz".format(sub, ses))
+    out_path = os.path.join(tmp_folder, "{}_{}_resampled_vessel_atlas.nii.gz".format(sub, ses))
     _, _, vessel_mni_volume_resampled = resample_volume(vessel_mni_reg_volume_path, desired_spacing, out_path)
 
     lesions = []  # initialize empty list; this will remain empty for control subjects, while it will contain the path to the lesions for patients with one (or more) aneurysm(s)
@@ -125,12 +131,12 @@ def extract_negative_patches(subdir, n4bfc_bet_angio_path, bids_dataset_path, de
 
         # extract LANDMARK negative patches
         if extract_landmark_patches:  # if we want to extract the negative patches in correspondence of the landmark points
-            n, landmark_patches_list, _ = nb_last_created_patch(os.path.join(neg_patches_path, "{0}_{1}".format(sub, ses)))
+            n, landmark_patches_list, _ = nb_last_created_patch(os.path.join(neg_patches_path, "{}_{}".format(sub, ses)))
             extract_neg_landmark_patches(neg_patches_path, sub, ses, n, tmp_folder, original_angio_volume_path, desired_spacing, resampled_bfc_tof_aff_mat,
                                          registrations_dir, mni_landmark_points_path, shift_scale_1, resampled_bfc_tof_volume_sitk, lesion_coord, landmark_patches_list)
 
         # extract RANDOM negative patches
-        n, _, random_patches_list = nb_last_created_patch(os.path.join(neg_patches_path, "{0}_{1}".format(sub, ses)))
+        n, _, random_patches_list = nb_last_created_patch(os.path.join(neg_patches_path, "{}_{}".format(sub, ses)))
         extract_random_neg_patches(n, nb_random_patches_per_sub, angio_min_x, angio_max_x, angio_min_y, angio_max_y, angio_min_z, angio_max_z, shift_scale_1,
                                    vessel_mni_volume_resampled, resampled_bfc_tof_volume, seed_ext, lesion_coord, patch_side, neg_patches_path, sub, ses, resampled_bfc_tof_aff_mat, random_patches_list, intensity_thresholds)
 
@@ -144,12 +150,12 @@ def extract_negative_patches(subdir, n4bfc_bet_angio_path, bids_dataset_path, de
 
         # extract LANDMARK patches
         if extract_landmark_patches:  # if we want to extract the negative patches in correspondence of the landmark points
-            n, landmark_patches_list, _ = nb_last_created_patch(os.path.join(neg_patches_path, "{0}_{1}".format(sub, ses)))
+            n, landmark_patches_list, _ = nb_last_created_patch(os.path.join(neg_patches_path, "{}_{}".format(sub, ses)))
             extract_neg_landmark_patches(neg_patches_path, sub, ses, n, tmp_folder, original_angio_volume_path, desired_spacing, resampled_bfc_tof_aff_mat,
                                          registrations_dir, mni_landmark_points_path, shift_scale_1, resampled_bfc_tof_volume_sitk, lesion_coord, landmark_patches_list)
 
         # extract RANDOM negative patches
-        n, _, random_patches_list = nb_last_created_patch(os.path.join(neg_patches_path, "{0}_{1}".format(sub, ses)))
+        n, _, random_patches_list = nb_last_created_patch(os.path.join(neg_patches_path, "{}_{}".format(sub, ses)))
         extract_random_neg_patches(n, nb_random_patches_per_sub, angio_min_x, angio_max_x, angio_min_y, angio_max_y, angio_min_z, angio_max_z, shift_scale_1,
                                    vessel_mni_volume_resampled, resampled_bfc_tof_volume, seed_ext, lesion_coord, patch_side, neg_patches_path, sub, ses, resampled_bfc_tof_aff_mat, random_patches_list, intensity_thresholds)
     # -------------------------------------------------------------------------------------
@@ -179,9 +185,9 @@ def extract_positive_patches(subdir, aneurysm_mask_path, bids_dataset_path, desi
         os.makedirs(out_dataset_path)  # create data_set folder with today's date in the filename
         print("\nCreated Data Set Folder\n")
 
-    assert os.path.exists(bids_dataset_path), "Path {0} does not exist".format(bids_dataset_path)  # make sure that path exists
+    assert os.path.exists(bids_dataset_path), "Path {} does not exist".format(bids_dataset_path)  # make sure that path exists
     bias_field_corrected_folders = os.path.join(bids_dataset_path, "derivatives", "N4_bias_field_corrected")
-    assert os.path.exists(bias_field_corrected_folders), "path {0} does not exist".format(bias_field_corrected_folders)  # make sure that path exists
+    assert os.path.exists(bias_field_corrected_folders), "path {} does not exist".format(bias_field_corrected_folders)  # make sure that path exists
 
     shift_scale_1 = patch_side // 2  # define shift of cubic patches
     sub = re.findall(r"sub-\d+", subdir)[0]  # type: str # extract sub
@@ -242,8 +248,8 @@ def extract_positive_patches(subdir, aneurysm_mask_path, bids_dataset_path, desi
             big_lesion_flag = 0  # type: int
             seed_ext = []  # initialize empty list where we'll store the seed used for good positive patches
             for n in range(nb_pos_patches_per_sub):
-                pos_patches_masks_path = os.path.join(tmp_path_pos_patches_masks, "patch_pair_{0}".format(n + 1))
-                pos_patch_path = os.path.join(tmp_path_pos_patches, "patch_pair_{0}".format(n + 1))
+                pos_patches_masks_path = os.path.join(tmp_path_pos_patches_masks, "patch_pair_{}".format(n + 1))
+                pos_patch_path = os.path.join(tmp_path_pos_patches, "patch_pair_{}".format(n + 1))
                 seed = randrange(3000)  # generate random seed
                 if not os.path.exists(pos_patches_masks_path) and not os.path.exists(pos_patch_path) and seed not in seed_ext:  # if folder doesn't exist
                     if big_lesion_flag == 0:  # this if condition will be satisfied at least once (first iteration)
@@ -255,8 +261,8 @@ def extract_positive_patches(subdir, aneurysm_mask_path, bids_dataset_path, desi
                             if emergency_exit < 2000:  # we try to find a good patch for XX times
                                 # Create translated Mask-Patches using lesion information
                                 patch_mask_translated_scale_1 = nii_mask_volume[x_transl - shift_scale_1: x_transl + shift_scale_1,
-                                                                y_transl - shift_scale_1: y_transl + shift_scale_1,
-                                                                z_transl - shift_scale_1: z_transl + shift_scale_1]
+                                                                                y_transl - shift_scale_1: y_transl + shift_scale_1,
+                                                                                z_transl - shift_scale_1: z_transl + shift_scale_1]
 
                                 # if the size of the bigger translated mask patch is not squared, or is empty, or does not include at least 80% of the mask
                                 if patch_mask_translated_scale_1.size == 0 or patch_mask_translated_scale_1.shape != (patch_side, patch_side, patch_side) or np.count_nonzero(patch_mask_translated_scale_1) < 0.8 * nb_white_voxels:
@@ -287,23 +293,23 @@ def extract_positive_patches(subdir, aneurysm_mask_path, bids_dataset_path, desi
 
                             # Create TOF Patch using lesion information
                             patch_before_bet_transl_scale_1 = nii_original[x_transl - shift_scale_1: x_transl + shift_scale_1,
-                                                              y_transl - shift_scale_1: y_transl + shift_scale_1,
-                                                              z_transl - shift_scale_1: z_transl + shift_scale_1]  # crop volume
+                                                                           y_transl - shift_scale_1: y_transl + shift_scale_1,
+                                                                           z_transl - shift_scale_1: z_transl + shift_scale_1]  # crop volume
 
                             patch_after_bet_transl_scale_1 = nii_volume_after_bet[x_transl - shift_scale_1: x_transl + shift_scale_1,
-                                                             y_transl - shift_scale_1: y_transl + shift_scale_1,
-                                                             z_transl - shift_scale_1: z_transl + shift_scale_1]  # crop
+                                                                                  y_transl - shift_scale_1: y_transl + shift_scale_1,
+                                                                                  z_transl - shift_scale_1: z_transl + shift_scale_1]  # crop
 
                             assert patch_before_bet_transl_scale_1.size != 0 and patch_before_bet_transl_scale_1.shape == (patch_side, patch_side, patch_side)
                             assert patch_after_bet_transl_scale_1.size != 0 and patch_after_bet_transl_scale_1.shape == (patch_side, patch_side, patch_side)
 
                             # Sanity Check (SC) to see if the lesion was not cropped out by the Brain Extraction Tool (BET); performed with coords/volumes before padding
                             sc_patch_original = nii_original[x_center - sc_shift:x_center + sc_shift,
-                                                y_center - sc_shift:y_center + sc_shift,
-                                                z_central - sc_shift:z_central + sc_shift]  # crop volume with lesion info
+                                                             y_center - sc_shift:y_center + sc_shift,
+                                                             z_central - sc_shift:z_central + sc_shift]  # crop volume with lesion info
                             sc_patch_after_bet = nii_volume_after_bet[x_center - sc_shift:x_center + sc_shift,
-                                                 y_center - sc_shift:y_center + sc_shift,
-                                                 z_central - sc_shift:z_central + sc_shift]  # crop volume with lesion info
+                                                                      y_center - sc_shift:y_center + sc_shift,
+                                                                      z_central - sc_shift:z_central + sc_shift]  # crop volume with lesion info
 
                             # round decimal digits to 1 because sometimes the last digits are different between original and BET
                             sc_patch_original = np.around(sc_patch_original, decimals=1)
@@ -387,10 +393,9 @@ def create_patch_ds(bids_dataset_path, mni_landmark_points_path, out_dataset_pat
     if vessel_like_neg_patches > 0:  # if we will create the vessel-like negative patches
         # we must extract some numerical thresholds to use for extracting vessel-like negative patches (i.e. neg patches similar to positive ones)
         print("\nComputing intensity thresholds...")
-        intensity_thresholds = [0.0252, 0.0081, 0.103, 0.0822, np.array([143230.05])]  # ADAM
-        # TODO: uncomment after debugging
-        # intensity_thresholds = extract_thresholds_of_intensity_criteria(bids_dataset_path, patch_side, desired_spacing, out_dataset_path, n_parallel_jobs, overlapping)
+        intensity_thresholds = extract_thresholds_of_intensity_criteria(bids_dataset_path, patch_side, desired_spacing, out_dataset_path, n_parallel_jobs, overlapping)
         print("Done extracting intensity thresholds")
+
     # create input lists to create negative patches in parallel
     all_subdirs = []
     all_files = []
