@@ -7,7 +7,7 @@
 
 This repository contains the code used for the [paper](https://arxiv.org/abs/2103.06168):
 ```
-"Towards clinically applicable automated aneurysm detection in TOF-MRA: weak labels, anatomical knowledge, and open data"
+"Towards automated brain aneurysm detection in TOF-MRA: open data, weak labels, and anatomical knowledge"
 ```
 
 ## Installation
