@@ -159,4 +159,3 @@ dependencies:
     - statsmodels==0.12.2
     - tifffile==2021.4.8
     - webcolors==1.11.1
-prefix: /data/hagmann_group/lausanne_aneurysms/miniconda3/envs/TF2
