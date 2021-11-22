@@ -1,3 +1,10 @@
+"""
+Created on Apr 6, 2021
+
+This script performs inference via the sliding-window approach.
+
+"""
+
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # used to remove some tensorflow warnings
 from datetime import datetime
@@ -9,7 +16,6 @@ import nibabel as nib
 import numpy as np
 import tensorflow as tf
 import shutil
-import getpass
 import sys
 from shutil import copyfile
 import time
@@ -17,6 +23,12 @@ from inference.utils_inference import extract_reg_quality_metrics_one_sub, retri
     extracting_conditions_are_met, create_tf_dataset, create_output_folder, check_registration_quality, compute_patient_wise_metrics, create_input_lists, \
     save_and_print_results, convert_mni_to_angio, extract_thresholds_for_anatomically_informed, load_file_from_disk, save_sliding_window_mask_to_disk, \
     check_output_consistency_between_detection_and_segmentation, sanity_check_inputs, str2bool, create_unet, print_running_time, load_config_file
+
+
+__author__ = "Tommaso Di Noto"
+__version__ = "0.0.1"
+__email__ = "tommydino@hotmail.it"
+__status__ = "Prototype"
 
 
 def inference_one_subject(subdir, file, bids_dir_path, sub_ses_test, unet_checkpoint_path, unet_patch_side, unet_batch_size, unet_threshold,
@@ -251,18 +263,9 @@ def main():
     ground_truth_dir = config_dict['ground_truth_dir']
     id_output_dir = config_dict['id_output_dir']
 
-    out_date = (datetime.today().strftime('%b_%d_%Y'))  # type: str # save today's date
-    out_date_hours_minutes = (datetime.today().strftime('%b_%d_%Y_%Hh%Mm'))  # type: str # save today's date
-    on_hpc_cluster = getpass.getuser() in ['to5743']  # type: bool # check if user is in list of authorized users
-    if on_hpc_cluster:  # if we are running in the HPC
-        nb_parallel_jobs = -1  # type: int # number of jobs to run in parallel with joblib
-        landmarks_physical_space_path = "/data/hagmann_group/lausanne_aneurysms/MNI_Landmark_Points/Landmarks_LPS_mm_Dec_05_2020.csv"
-        inference_outputs_path = "/data/hagmann_group/lausanne_aneurysms/patient_wise_outputs"
-
-    else:  # if instead we want to run locally
-        nb_parallel_jobs = 5  # type: int # number of jobs to run in parallel with joblib
-        landmarks_physical_space_path = "/home/newuser/Desktop/MNI_Registration_Aneurysms_Dataset/Anatomical_Landmarks/Landmarks_LPS_mm_Dec_05_2020.csv"
-        inference_outputs_path = "/home/newuser/Desktop/MICCAI_Aneurysms/Unil_CHUV_Team_Predictions/patient_wise_{}/".format(out_date_hours_minutes)
+    nb_parallel_jobs = config_dict['nb_parallel_jobs']
+    landmarks_physical_space_path = config_dict['landmarks_physical_space_path']
+    inference_outputs_path = config_dict['inference_outputs_path']
 
     # make sure that inputs are fine
     sanity_check_inputs(unet_patch_side, unet_batch_size, unet_threshold, overlapping, new_spacing, conv_filters, cv_folds, anatomically_informed_sliding_window,
@@ -273,6 +276,7 @@ def main():
     all_subdirs, all_files = create_input_lists(bids_dir)
 
     # ------------------ COPY config file to output directory
+    out_date_hours_minutes = (datetime.today().strftime('%b_%d_%Y_%Hh%Mm'))  # type: str # save today's date
     id_output_dir = "{}_{}".format(id_output_dir, out_date_hours_minutes)  # add date to dataset name
     path_config_file = sys.argv[2]  # type: str # save filename
     if not os.path.exists(os.path.join(inference_outputs_path, id_output_dir)):  # if path does not exist
@@ -281,6 +285,7 @@ def main():
 
     # ---------------------------------------- loop over training folds of cross-validation
     metrics_cv_folds = []  # type: list # will contain the output metrics of all the subjects for each fold
+    out_date = (datetime.today().strftime('%b_%d_%Y'))  # type: str # save today's date
 
     for cv_fold in range(1, cv_folds + 1):
         print("\nBegan fold {}".format(cv_fold))
@@ -298,33 +303,15 @@ def main():
         # ----------------------- load test subjects for this cross-validation split -----------------------
         sub_ses_test = load_file_from_disk(test_subs_path)  # type: list
         # --------------- compute thresholds for anatomically-informed sliding-window
-        # reg_quality_metrics_threshold, intensity_thresholds, distances_thresholds, dark_fp_threshold = extract_thresholds_for_anatomically_informed(bids_dir,
-        #                                                                                                                                             sub_ses_test,
-        #                                                                                                                                             unet_patch_side,
-        #                                                                                                                                             new_spacing,
-        #                                                                                                                                             inference_outputs_path,
-        #                                                                                                                                             nb_parallel_jobs,
-        #                                                                                                                                             overlapping,
-        #                                                                                                                                             landmarks_physical_space_path,
-        #                                                                                                                                             out_final_location_dir)
-
-        # uncomment lines below for fast debugging (fold1 chuv)
-        # reg_quality_metrics_threshold = (-3.7482000589370728, -0.3016154289245605)
-        # intensity_thresholds = (0.023522998701642785, 0.012589970147801373, 0.07025011703372001, 0.06542018130421638, 119337.2)
-        # distances_thresholds = (19.45955924697339, 49.46659320600574)
-        # dark_fp_threshold = 0.95
-
-        # uncomment lines below for fast debugging (fold5 chuv)
-        reg_quality_metrics_threshold = (-3.7389371967315674, -0.3366133630275726)
-        intensity_thresholds = (0.02076771406158989, 0.011568877034018557, 0.07091915905475617, 0.06656491123139859, 108237.45)
-        distances_thresholds = (20.533169714210402, 50.276529591614164)
-        dark_fp_threshold = 0.95
-
-        # uncomment lines below for fast debugging (fold5 adam)
-        # reg_quality_metrics_threshold = (-6.629095230102539, -0.26493766546249387)
-        # intensity_thresholds = (0.042757768727209294, 0.02973751152960658, 0.11645360365509987, 0.09720990434288979, 184865.7)
-        # distances_thresholds = (12.223078044190704, 48.70461922345519)
-        # dark_fp_threshold = 0.17355505425391163
+        reg_quality_metrics_threshold, intensity_thresholds, distances_thresholds, dark_fp_threshold = extract_thresholds_for_anatomically_informed(bids_dir,
+                                                                                                                                                    sub_ses_test,
+                                                                                                                                                    unet_patch_side,
+                                                                                                                                                    new_spacing,
+                                                                                                                                                    inference_outputs_path,
+                                                                                                                                                    nb_parallel_jobs,
+                                                                                                                                                    overlapping,
+                                                                                                                                                    landmarks_physical_space_path,
+                                                                                                                                                    out_final_location_dir)
 
         print("\nreg_quality_metrics_threshold = {}".format(reg_quality_metrics_threshold))
         print("intensity_thresholds = {}".format(intensity_thresholds))
