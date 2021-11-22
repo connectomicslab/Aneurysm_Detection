@@ -5,6 +5,7 @@ This script loops through the input BIDS dataset and creates a sub-dataset of pa
 are extracted. For patients (subjects with aneurysm(s)), both negative (without aneurysm) and positive (with aneurysm) patches are extracted.
 
 """
+
 import time
 import os
 from datetime import datetime
@@ -24,7 +25,7 @@ from inference.utils_inference import load_config_file, str2bool
 
 __author__ = "Tommaso Di Noto"
 __version__ = "0.0.1"
-__email__ = "Tommaso.Di-Noto@chuv.ch"
+__email__ = "tommydino@hotmail.it"
 __status__ = "Prototype"
 
 
