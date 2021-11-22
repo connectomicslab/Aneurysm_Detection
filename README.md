@@ -18,7 +18,7 @@ You can download the dataset used for this study from this [OpenNEURO link](http
 
 ### Setup conda environment
 1) Clone the repository
-2) Create a conda environment using the `environment.yml` file located inside the `install` directory. If you are not familiar with conda environments, please check out the [official documentation](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html). Alternatively, feel free to use your favorite [IDE](https://en.wikipedia.org/wiki/Integrated_development_environment) such as [PyCharm](https://www.jetbrains.com/pycharm/download/#section=linux) or [Visual Studio](https://visualstudio.microsoft.com/downloads/) to set up the environment.
+2) Create a conda environment using the `environment_clean.yml` file located inside the `install` directory. If you are not familiar with conda environments, please check out the [official documentation](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html). Alternatively, feel free to use your favorite [IDE](https://en.wikipedia.org/wiki/Integrated_development_environment) such as [PyCharm](https://www.jetbrains.com/pycharm/download/#section=linux) or [Visual Studio](https://visualstudio.microsoft.com/downloads/) to set up the environment.
 ## Usage
 **N.B.** if only interested in Inference, please skip to [Section 3 - Inference](#3-inference). Instead, to run the whole pipeline, begin from [Section 1 - Creation of training dataset](#1-creation-of-training-dataset)
 ### 1) Creation of training dataset
