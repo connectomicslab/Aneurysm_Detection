@@ -1,8 +1,14 @@
+"""
+Created on Apr 6, 2021
+
+This script performs the training of the cross-validation
+
+"""
+
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import tensorflow as tf
 import time
-import sys
 from datetime import datetime
 import re
 import numpy as np
@@ -11,11 +17,16 @@ import pickle
 import nibabel as nib
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
-import math
 from joblib import Parallel, delayed
-import getpass
 import random
 from typing import List
+from inference.utils_inference import load_config_file, str2bool, round_half_up
+
+
+__author__ = "Tommaso Di Noto"
+__version__ = "0.0.1"
+__email__ = "tommydino@hotmail.it"
+__status__ = "Prototype"
 
 
 def load_pickle_list_from_disk(path_to_list: str) -> List:
@@ -53,26 +64,6 @@ def split_list_equal_sized_groups(lst: list, n: int, seed: float = 123) -> List:
     return out_list
 
 
-def str2bool(v: str) -> bool:
-    """This function converts the input parameter into a boolean
-    Args:
-        v (*): input argument
-    Returns:
-        True: if the input argument is 'yes', 'true', 't', 'y', '1'
-        False: if the input argument is 'no', 'false', 'f', 'n', '0'
-    Raises:
-        ValueError: if the input argument is none of the above
-    """
-    if isinstance(v, bool):
-        return v
-    if v.lower() in ('yes', 'true', 't', 'y', '1'):
-        return True
-    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
-        return False
-    else:
-        raise ValueError('Boolean value expected.')
-
-
 def save_pickle_list_to_disk(list_to_save: list, out_dir: str, out_filename: str) -> None:
     """This function saves a list to disk
     Args:
@@ -87,17 +78,6 @@ def save_pickle_list_to_disk(list_to_save: list, out_dir: str, out_filename: str
     open_file = open(os.path.join(out_dir, out_filename), "wb")
     pickle.dump(list_to_save, open_file)  # save list with pickle
     open_file.close()
-
-
-def round_half_up(n, decimals=0):
-    """This function rounds to the nearest integer number (e.g 2.4 becomes 2.0 and 2.6 becomes 3);
-     in case of tie, it rounds up (e.g. 1.5 becomes 2.0 and not 1.0)
-    Args:
-        n (float): number to round
-        decimals (int): number of decimal figures that we want to keep; defaults to zero
-    """
-    multiplier = 10 ** decimals
-    return math.floor(n*multiplier + 0.5) / multiplier
 
 
 def find_pairs_and_labels(pos_patch_path, neg_patch_path):
@@ -887,7 +867,7 @@ def cross_validation(data_path, lambda_loss, epochs, batch_size, lr, conv_filter
         None
     """
     assert fold_to_do in range(1, 6), "Fold can only be 1, 2, 3, 4, 5; found {} instead".format(fold_to_do)
-    print("\nTensorflow version used: {0}".format(tf.version.VERSION))  # print tensorflow version
+    print("\nTensorflow version used: {}".format(tf.version.VERSION))  # print tensorflow version
     # ------------------------------------------------------------------------
     neg_patch_path = os.path.join(data_path, "Negative_Patches")
     pos_patch_path = os.path.join(data_path, "Positive_Patches")
@@ -909,40 +889,32 @@ def cross_validation(data_path, lambda_loss, epochs, batch_size, lr, conv_filter
 
 
 def main():
-    # set input ARGS
-    epochs = 80  # type: int # number of training epochs
-    lambda_loss = 0.5  # type: float # value that weights the two terms of the hybrid loss
-    batch_size = 8  # type: int
-    lr = 1e-04  # type: float # learning rate
-    conv_filters = [9, 26, 61, 74]  # type: list
-    cross_validation_folds = 5  # type: int
-    percentage_validation_subs = 0.2  # type: float
+    # the code inside here is run only when THIS script is run, and not just imported
+    config_dict = load_config_file()  # load input config file with argparser
 
-    on_hpc_cluster = getpass.getuser() in ['to5743']  # type: bool # check if user is in list of authorized users
-    if on_hpc_cluster:  # if we are running on the HPC
-        n_parallel_jobs = -1  # type: int
-        assert tf.test.is_built_with_cuda(), "TF was not built with CUDA"
-        assert tf.config.experimental.list_physical_devices('GPU'), "GPU not available"
-        data_path = sys.argv[1]  # the user chooses the folder from which to fetch data with the first argument
-        fold_to_do = int(sys.argv[2])  # the five folds are 1, 2, 3, 4, 5
-        use_validation_data = sys.argv[3]  # whether to use validation data or not; in general we use it, but not if it's the last submission (in that case we want to use all data)
-        input_ds_identifier = sys.argv[4]  # user need to specify an ID for the input dataset of patches
-        path_previous_weights_for_pretraining = sys.argv[5]
-        new_added_subs = sys.argv[6]  # path to list containing the new added subjects
-        train_test_split_to_replicate = sys.argv[7]  # since we want to make a strict comparison, we need the exact same test subjects used for the previous experiment
-    else:  # if instead we want to run locally
-        n_parallel_jobs = 1  # type: int
-        data_path = '/home/newuser/Desktop/Data_Set_Patches/Data_Set_Jul_13_2021_ADAM'
-        fold_to_do = 1  # the five folds are 1, 2, 3, 4, 5
-        use_validation_data = True
-        input_ds_identifier = 'chuv_with_pretrain_adam'
-        path_previous_weights_for_pretraining = "/home/newuser/Desktop/Data_Set_Patches/Train_Outputs_Aug_**_2021_whole_adam/whole_dataset/saved_models"
-        new_added_subs = "/home/newuser/Desktop/MICCAI_Aneurysms/patients_with_voxelwise_labels.pkl"
-        train_test_split_to_replicate = "/home/newuser/Desktop/Data_Set_Patches/Train_Outputs_Jul_14_2021_chuv_weak"
+    # extract input args from dictionary
+    epochs = config_dict['epochs']  # type: int # number of training epochs
+    lambda_loss = config_dict['lambda_loss']  # type: float # value that weights the two terms of the hybrid loss
+    batch_size = config_dict['batch_size']  # type: int
+    lr = config_dict['lr']  # type: float # learning rate
+    conv_filters = config_dict['conv_filters']  # type: list # number of filters in the convolutional layers
+    cross_validation_folds = config_dict['cross_validation_folds']  # type: int # number of CV folds
+    percentage_validation_subs = config_dict['percentage_validation_subs']   # type: float # percentage of samples to use for validation
+    n_parallel_jobs = config_dict['n_parallel_jobs']  # type: int # nb. jobs to run in parallel (i.e. number of CPU (cores) to use); if set to -1, all available CPUs are used
 
-    use_validation_data = str2bool(use_validation_data)  # convert input string to bool
+    data_path = config_dict['data_path']  # type: str # path to dataset of patches
+    fold_to_do = config_dict['fold_to_do']  # type: int # the five folds are 1, 2, 3, 4, 5
+    use_validation_data = str2bool(config_dict['use_validation_data'])  # type: bool # whether to use validation data or not
+    input_ds_identifier = config_dict['input_ds_identifier']  # type: str # unique name given to rename output folders
+    path_previous_weights_for_pretraining = config_dict['path_previous_weights_for_pretraining']  # type: str # path where weights of an already-trained model are stored
+    new_added_subs = config_dict['data_path']  # type: str # path to pickle file containing the added subjects with voxelwise labels
+    train_test_split_to_replicate = config_dict['train_test_split_to_replicate']  # type: str # path to directory containing the test subjects of each CV split
+
     date = (datetime.today().strftime('%b_%d_%Y'))  # save today's date
     training_outputs_folder = "Train_Outputs_{}_{}".format(date, input_ds_identifier)  # type: str # name of folder where all training outputs will be saved
+
+    assert tf.test.is_built_with_cuda(), "TF was not built with CUDA"
+    assert tf.config.experimental.list_physical_devices('GPU'), "GPU not available"
 
     # begin cross validation
     cross_validation(data_path, lambda_loss, epochs, batch_size, lr, conv_filters, percentage_validation_subs, n_parallel_jobs, date,
