@@ -1,0 +1,26 @@
+name: env_name
+channels:
+  - simpleitk
+  - anaconda
+  - conda-forge
+  - defaults
+dependencies:
+  - joblib=0.17
+  - nibabel=3.2
+  - simpleitk=2.0
+  - pandas=1.2
+  - scipy=1.6
+  - pip:
+    - numpy==1.20
+    - connected-components-3d==3.2
+    - scikit-image==0.18
+    - opencv-python==4.5
+    - antspyx==0.2
+    - tensorboard=2.4
+    - tensorboard-plugin-wit=1.6
+    - tensorflow=2.4
+    - tensorflow-base=2.4
+    - tensorflow-estimator=2.4
+    - tensorflow-gpu=2.4
+    - matplotlib=3.2
+    - matplotlib-base=3.2
