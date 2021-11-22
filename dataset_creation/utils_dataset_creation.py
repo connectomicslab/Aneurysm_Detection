@@ -23,13 +23,11 @@ from joblib import Parallel, delayed
 import shutil
 import pickle
 from typing import List
-import argparse
-import json
 
 
 __author__ = "Tommaso Di Noto"
 __version__ = "0.0.1"
-__email__ = "Tommaso.Di-Noto@chuv.ch"
+__email__ = "tommydino@hotmail.it"
 __status__ = "Prototype"
 
 
