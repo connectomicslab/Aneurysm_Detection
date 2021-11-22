@@ -1,3 +1,10 @@
+"""
+Created on Apr 6, 2021
+
+Utility scripts for inference with sliding-window.
+
+"""
+
 import os
 import pandas as pd
 import numpy as np
@@ -20,7 +27,12 @@ import cv2
 import pickle
 import argparse
 import json
-import time
+
+
+__author__ = "Tommaso Di Noto"
+__version__ = "0.0.1"
+__email__ = "tommydino@hotmail.it"
+__status__ = "Prototype"
 
 
 def create_input_lists(bids_dir):
