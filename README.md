@@ -39,7 +39,13 @@ Then, the script can be run with:
 network_training.py --config config_training.json
 ```
 ### 3) Inference
-The last step of the pipeline is the patient-wise inference performed on the test subjects with the sliding-window approach. The script used to carry out inference is `patient_wise_sliding_window.py` and it is located inside the `inference` directory, together with the config file `config_inference.json`. Before running the script, you should modify the paths in the config files according to the previous steps.
+The last step of the pipeline is the patient-wise inference performed on the test subjects with the sliding-window approach. The script used to carry out inference is `patient_wise_sliding_window.py` and it is located inside the `inference` directory, together with the config file `config_inference.json`.
+
+If you ran the pipeline from the beginning (i.e. through steps 1) and 2)), then the `training_outputs_path` inside `config_inference.json` must correspond to the output folder that was created from [step 2)](#2-training). This output folder has been created in the same directory where the dataset of patches was created (`out_dataset_path` of [step 1)](#1-creation-of-training-dataset)) and should be named "Train_Outputs_%date_%input_ds_identifier".
+
+If instead you only wish to run inference (with pretrained weights), then the `training_outputs_path` inside `config_inference.json`can simply be set to `Aneurysm_Detection/extra_files/Train_Outputs_Aug_16_2021_chuv_weak_plus_voxelwise_pretrain_adam_github/`
+
+Before running the script, you should also modify the paths in the config files according to the previous steps.
 Then, the script can be run with:
 ```python
 patient_wise_sliding_window.py --config config_inference.json
