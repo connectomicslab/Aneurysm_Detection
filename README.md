@@ -1,6 +1,6 @@
 # "Towards automated brain aneurysm detection in TOF-MRA: open data, weak labels, and anatomical knowledge"
 <p float="middle">
-  <img src="https://github.com/connectomicslab/Aneurysm_Detection/blob/main/images/model_prediction.png" width="250" />
+  <img src="https://github.com/connectomicslab/Aneurysm_Detection/blob/main/images/model_prediction_Nov_30_2021.png" width="335" />
   <img src="https://github.com/connectomicslab/Aneurysm_Detection/blob/main/images/anat_inf_sliding_window.png" width="340" /> 
 </p>
 
