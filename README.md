@@ -29,7 +29,7 @@ You can download the dataset used for this study from this [OpenNEURO link](http
  
  Then, the script can be run with:
 ```python
-random_scramble_sessions_bids_dataset.py --config config_creation_ds_patches.json
+create_dataset_patches_neg_and_pos.py --config config_creation_ds_patches.json
 ```
 Since the dataset is created in parallel, consider increasing `jobs_in_parallel` in the config file to speed up the process (the higher, the better!). Feel free to modify the parameters inside the config file in case you would like to create a different dataset.
 ### 2) Training
