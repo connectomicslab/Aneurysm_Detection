@@ -5,7 +5,9 @@
 </p>
 
 
-This repository contains the code used for the [paper](https://arxiv.org/abs/2103.06168): "Towards automated brain aneurysm detection in TOF-MRA: open data, weak labels, and anatomical knowledge". Please cite the paper when you are using either our dataset or model.
+This repository contains the code used for the [paper](https://arxiv.org/abs/2103.06168): "Towards automated brain aneurysm detection in TOF-MRA: open data, weak labels, and anatomical knowledge". 
+
+Please cite the paper if you are using either our dataset or model.
 
 ## Installation
 **Disclaimer**: the results of the paper were obtained with python 3.6 and a Linux (centOS) operating system. Reproducibility for different configurations is not guaranteed.
