@@ -108,7 +108,7 @@ def load_resampled_vol_and_boundaries(volume_path, new_spacing_, tmp_folder_, su
         min_z_nii_volume (int): min non-zero slice of numpy volume
         max_z_nii_volume (int): max non-zero slice of numpy volume
     """
-    out_path = os.path.join(tmp_folder_, "{0}_{1}_resampled_bet_tof_bfc.nii.gz".format(sub_, ses_))
+    out_path = os.path.join(tmp_folder_, "{}_{}_resampled_bet_tof_bfc.nii.gz".format(sub_, ses_))
     resampled_volume_obj_sitk, resampled_volume_obj_nib, resampled_volume = resample_volume(volume_path, new_spacing_, out_path)
     assert len(resampled_volume.shape) == 3, "Nifti volume is not 3D"
     non_zero_array = np.asarray(np.argwhere(resampled_volume != 0))  # save all zero voxels
@@ -164,13 +164,13 @@ def extract_lesion_info_modified(path_to_lesion, tmp_folder, new_spacing, sub_, 
         AssertionError: if the binary mask has more than 1 connected component
     """
     lesion_info = {}  # initialize empty dict; this will be the output of the function
-    out_path_ = os.path.join(tmp_folder, "{0}_{1}_mask.nii.gz".format(sub_, ses_))
+    out_path_ = os.path.join(tmp_folder, "{}_{}_mask.nii.gz".format(sub_, ses_))
     # resample lesion mask. N.B. interpolator is set to NearestNeighbor so we are sure that we don't create new connected components
     _, _, lesion_volume = resample_volume(path_to_lesion, new_spacing, out_path_, interpolator=sitk.sitkNearestNeighbor)
     if len(lesion_volume.shape) == 4:  # if the numpy array is not 3D
         lesion_volume = np.squeeze(lesion_volume, axis=3)  # we drop the fourth dimension (time dimension) which is useless in our case
 
-    assert np.array_equal(lesion_volume, lesion_volume.astype(bool)), "WATCH OUT: mask is not binary for {0}".format(path_to_lesion)
+    assert np.array_equal(lesion_volume, lesion_volume.astype(bool)), "WATCH OUT: mask is not binary for {}".format(path_to_lesion)
     assert np.count_nonzero(lesion_volume) > 0, "WATCH OUT: mask is empty (i.e. all zero-voxels)"
 
     labels_out = cc3d.connected_components(np.asarray(lesion_volume, dtype=int))
@@ -189,8 +189,8 @@ def extract_lesion_info_modified(path_to_lesion, tmp_folder, new_spacing, sub_, 
                 nb_white_pixels = np.count_nonzero(lesion_volume[:, :, z])  # update max number of white pixels if there are more than the previous slice
                 idx = z  # update slice index if there are more white pixels than the previous one
     if prints:  # if prints is set to True when invoking the method
-        print("\nThe aneurysms is present in {0} different slices.".format(slices_enclosing_aneurysms))
-        print("\nThe slice with more white pixels has index {0} and contains {1} white pixels. \n".format(idx, np.count_nonzero(lesion_volume[:, :, idx])))
+        print("\nThe aneurysms is present in {} different slices.".format(slices_enclosing_aneurysms))
+        print("\nThe slice with more white pixels has index {} and contains {} white pixels. \n".format(idx, np.count_nonzero(lesion_volume[:, :, idx])))
 
     properties = regionprops(lesion_volume[:, :, idx].astype(int))  # extract properties of slice with more white pixels
 
@@ -201,7 +201,7 @@ def extract_lesion_info_modified(path_to_lesion, tmp_folder, new_spacing, sub_, 
     cx = int(m["m10"] / m["m00"])  # calculate x coordinate of center
     cy = int(m["m01"] / m["m00"])  # calculate y coordinate of center
     if prints:  # if prints is set to True when invoking the method
-        print("The widest ROI has an equivalent diameter of {0} pixels and is approximately centered at x,y = [{1},{2}]\n".format(equiv_diameter, cx, cy))
+        print("The widest ROI has an equivalent diameter of {} pixels and is approximately centered at x,y = [{},{}]\n".format(equiv_diameter, cx, cy))
 
     # create dict fields (keys) and fill them with values
     lesion_info["slices"] = slices_enclosing_aneurysms
@@ -427,7 +427,7 @@ def extract_neg_patches_from_anatomical_landmarks(lesion_coords, resampled_origi
         t1_df = t1_df.drop_duplicates()
         # ------------------------------------------------------------------ T1_2_TOF -------------------------------------------------------------
         output_path_tof = os.path.join(csv_folder, "Transformed_Point_mm_TOF.csv")  # save output filename
-        # inverse_t1_2_tof_mat_file_path = "[{0}, 1]".format(struct_2_tof_mat_path)  # create inverted .mat file as requested from
+        # inverse_t1_2_tof_mat_file_path = "[{}, 1]".format(struct_2_tof_mat_path)  # create inverted .mat file as requested from
 
         modified_t1_df = pd.DataFrame(np.repeat(t1_df.values, 2, axis=0))
         modified_t1_df.columns = t1_df.columns
@@ -474,18 +474,18 @@ def extract_neg_patches_from_anatomical_landmarks(lesion_coords, resampled_origi
 
             # check that the shape of the patch is correct; sometimes the volume is just too small. If it's one of the shapes is not correct, skip this anatomical landmark
             if small_scale_bet_patch.shape == (shift_scale_1*2, shift_scale_1*2, shift_scale_1*2):
-                print("------------ patch_pair_{0} anatomical landmark".format(patch_pair_))
+                print("------------ patch_pair_{} anatomical landmark".format(patch_pair_))
                 # create nibabel objects
                 small_scale_bet_patch_obj = nib.Nifti1Image(small_scale_bet_patch, affine=bet_volume_affine)
 
                 # save nibabel objects
-                out_path = os.path.join(neg_patches_path, "{0}_{1}".format(sub_, ses_), "patch_pair_{0}_landmark".format(patch_pair_))
+                out_path = os.path.join(neg_patches_path, "{}_{}".format(sub_, ses_), "patch_pair_{}_landmark".format(patch_pair_))
                 if not os.path.exists(out_path):
                     os.makedirs(out_path)
-                    bet_angio_patch_name_scale_1 = '{0}_{1}_patch_pair_{2}_neg_patch_angio.nii.gz'.format(sub_, ses_, str(patch_pair_))
+                    bet_angio_patch_name_scale_1 = '{}_{}_patch_pair_{}_neg_patch_angio.nii.gz'.format(sub_, ses_, str(patch_pair_))
 
                     nib.save(small_scale_bet_patch_obj, os.path.join(out_path, bet_angio_patch_name_scale_1))
-                    print("Negative patches {0} created at center coordinates [{1}, {2}, {3}]".format(patch_pair_, center_voxel_coord_tof_resampled[0], center_voxel_coord_tof_resampled[1], center_voxel_coord_tof_resampled[2]))
+                    print("Negative patches {} created at center coordinates [{}, {}, {}]".format(patch_pair_, center_voxel_coord_tof_resampled[0], center_voxel_coord_tof_resampled[1], center_voxel_coord_tof_resampled[2]))
 
                     patch_pair_ += 1  # increment patch pair such that the name of the following pair will change
     return nb_landmarks
@@ -512,7 +512,7 @@ def create_negative_patch(output_path, sub, ses, n, seed, x_coord, y_coord, z_co
         os.makedirs(neg_patches_path)  # create folder
 
     os.makedirs(output_path)
-    angio_patch_name = '{0}_{1}_patch_pair_{2}_neg_patch_angio.nii.gz'.format(sub, ses, str(n))
+    angio_patch_name = '{}_{}_patch_pair_{}_neg_patch_angio.nii.gz'.format(sub, ses, str(n))
     # convert patches from numpy arrays to nibabel objects, preserving original affine, and casting to float32
     neg_patch_angio_obj = nib.Nifti1Image(random_neg_patch_angio, affine=resampled_bfc_tof_aff_mat)
 
@@ -520,10 +520,10 @@ def create_negative_patch(output_path, sub, ses, n, seed, x_coord, y_coord, z_co
         nib.save(neg_patch_angio_obj, os.path.join(output_path, angio_patch_name))  # create it
 
     if vessel_like:
-        print("------------ patch_pair_{0} intensity-matched, seed={1}".format(n, seed))
+        print("------------ patch_pair_{} intensity-matched, seed={}".format(n, seed))
     else:
-        print("------------ patch_pair_{0} random, seed={1}".format(n, seed))
-    print("Negative patch {0} created at center coordinates [i, j, k] = [{1}, {2}, {3}]".format(n, x_coord, y_coord, z_coord))
+        print("------------ patch_pair_{} random, seed={}".format(n, seed))
+    print("Negative patch {} created at center coordinates [i, j, k] = [{}, {}, {}]".format(n, x_coord, y_coord, z_coord))
 
 
 def nb_last_created_patch(input_path):
@@ -591,17 +591,17 @@ def extract_vessel_like_neg_patches(nb_vessel_like_patches_per_sub, angio_min_x,
                                                  vessel_mni_volume_resampled, random_neg_patch_angio, resampled_bfc_tof_volume, intensity_thresholds):
                     seed_ext.append(seed)  # append seed to external list so that it won't be re-used afterwards
 
-                    output_path = os.path.join(neg_patches_path, "{0}_{1}".format(sub, ses), "patch_pair_{0}_vessel_like".format(n + 1))
+                    output_path = os.path.join(neg_patches_path, "{}_{}".format(sub, ses), "patch_pair_{}_vessel_like".format(n + 1))
                     if not os.path.exists(output_path):
                         create_negative_patch(output_path, sub, ses, n + 1, seed, random_x_coord, random_y_coord, random_z_coord, random_neg_patch_angio, resampled_bfc_tof_aff_mat, neg_patches_path, vessel_like=True)
                         break  # stop while loop if the negative patch is good
                     else:
-                        print("{0}_{1}/patch_pair_{2} already exists".format(sub, ses, n + 1))
+                        print("{}_{}/patch_pair_{} already exists".format(sub, ses, n + 1))
                         break  # stop while loop
                 else:  # if the extracting conditions are not met
                     seed += 1  # increment seed, and thus try another patch center
             else:  # if however, the XX seed changes are not enough, discard subject
-                print("\nWARNING: Couldn't create negative patch for {0}_{1}".format(sub, ses))
+                print("\nWARNING: Couldn't create negative patch for {}_{}".format(sub, ses))
                 break  # stop while loop
 
     return seed_ext
@@ -653,18 +653,18 @@ def extract_random_neg_patches(n, nb_random_patches_per_sub, angio_min_x, angio_
                                                  vessel_mni_volume_resampled, random_neg_patch_angio, resampled_bfc_tof_volume, intensity_thresholds):
                     seed_ext.append(seed)  # append seed to external list so that it won't be re-used afterwards
 
-                    output_path = os.path.join(neg_patches_path, "{0}_{1}".format(sub, ses), "patch_pair_{0}_random".format(r))
+                    output_path = os.path.join(neg_patches_path, "{}_{}".format(sub, ses), "patch_pair_{}_random".format(r))
                     # if path does not exist and there are yet no random patches (i.e. random_patches_list is empty)
                     if not os.path.exists(output_path) and not random_patches_list:
                         create_negative_patch(output_path, sub, ses, r, seed, random_x_coord, random_y_coord, random_z_coord, random_neg_patch_angio, resampled_bfc_tof_aff_mat, neg_patches_path)
                         break  # stop while loop if the negative patch is good
                     else:
-                        print("{0}_{1}/patch_pair_{2} already exists".format(sub, ses, r))
+                        print("{}_{}/patch_pair_{} already exists".format(sub, ses, r))
                         break  # stop while loop
                 else:  # if the extracting conditions are not met
                     seed += 1  # increment seed, and thus try another patch center
             else:  # if however, the XX seed changes are not enough, discard subject
-                print("\nWARNING: Couldn't create negative patch for {0}_{1}".format(sub, ses))
+                print("\nWARNING: Couldn't create negative patch for {}_{}".format(sub, ses))
                 break  # stop while loop
 
 
@@ -676,10 +676,10 @@ def extract_neg_landmark_patches(neg_patches_path, sub, ses, n, tmp_folder, orig
         patch_pair = n + 1
     else:
         raise ValueError("n should not be lower than 1")
-    new_samples_output_path = os.path.join(neg_patches_path, "{0}_{1}".format(sub, ses), "patch_pair_{0}".format(patch_pair))
+    new_samples_output_path = os.path.join(neg_patches_path, "{}_{}".format(sub, ses), "patch_pair_{}".format(patch_pair))
     # if path does not exist and there are no landmark patches created (i.e. landmark_patches_list is empty)
     if not os.path.exists(new_samples_output_path) and not landmark_patches_list:
-        out_path = os.path.join(tmp_folder, "{0}_{1}_orig_tof_bfc.nii.gz".format(sub, ses))
+        out_path = os.path.join(tmp_folder, "{}_{}_orig_tof_bfc.nii.gz".format(sub, ses))
         _, _, resampled_orig_angio_volume = resample_volume(original_angio_volume_path, desired_spacing, out_path)  # extract numpy array of original angio TOF
         # invoke function to extract patches in correspondence to anatomical landmark points recurrent for aneurysm occurrence
         _ = extract_neg_patches_from_anatomical_landmarks(lesion_coord, resampled_orig_angio_volume, resampled_bfc_tof_aff_mat,
@@ -736,11 +736,11 @@ def retrieve_intensity_conditions_one_sub(subdir, aneurysm_mask_path, data_path,
         AssertionError: if the session (i.e. exam date) was not found
         AssertionError: if the lesion name was not found
     """
-    assert os.path.exists(data_path), "path {0} does not exist".format(data_path)
+    assert os.path.exists(data_path), "path {} does not exist".format(data_path)
     vessel_mni_registration_dir = os.path.join(data_path, "derivatives", "registrations", "vesselMNI_2_angioTOF")
-    assert os.path.exists(vessel_mni_registration_dir), "path {0} does not exist".format(vessel_mni_registration_dir)  # make sure that path exists
+    assert os.path.exists(vessel_mni_registration_dir), "path {} does not exist".format(vessel_mni_registration_dir)  # make sure that path exists
     bfc_derivatives_dir = os.path.join(data_path, "derivatives", "N4_bias_field_corrected")
-    assert os.path.exists(bfc_derivatives_dir), "path {0} does not exist".format(bfc_derivatives_dir)  # make sure that path exists
+    assert os.path.exists(bfc_derivatives_dir), "path {} does not exist".format(bfc_derivatives_dir)  # make sure that path exists
 
     shift_scale_1 = patch_side // 2
 
@@ -770,17 +770,17 @@ def retrieve_intensity_conditions_one_sub(subdir, aneurysm_mask_path, data_path,
 
     # save path of corresponding vesselMNI co-registered volume
     if "ADAM" in subdir:
-        vessel_mni_reg_volume_path = os.path.join(vessel_mni_registration_dir, sub, ses, "anat", "{0}_{1}_desc-vesselMNI2angio_deformed_ADAM.nii.gz".format(sub, ses))
+        vessel_mni_reg_volume_path = os.path.join(vessel_mni_registration_dir, sub, ses, "anat", "{}_{}_desc-vesselMNI2angio_deformed_ADAM.nii.gz".format(sub, ses))
     else:
-        vessel_mni_reg_volume_path = os.path.join(vessel_mni_registration_dir, sub, ses, "anat", "{0}_{1}_desc-vesselMNI2angio_deformed.nii.gz".format(sub, ses))
-    assert os.path.exists(vessel_mni_reg_volume_path), "Path {0} does not exist".format(vessel_mni_reg_volume_path)  # make sure path exists
+        vessel_mni_reg_volume_path = os.path.join(vessel_mni_registration_dir, sub, ses, "anat", "{}_{}_desc-vesselMNI2angio_deformed.nii.gz".format(sub, ses))
+    assert os.path.exists(vessel_mni_reg_volume_path), "Path {} does not exist".format(vessel_mni_reg_volume_path)  # make sure path exists
 
     if "ADAM" in subdir:
         bet_angio_bfc_path = os.path.join(bfc_derivatives_dir, sub, ses, "anat", "{}_{}_desc-angio_N4bfc_brain_mask_ADAM.nii.gz".format(sub, ses))  # type: str # save path of angio brain after Brain Extraction Tool (BET)
     else:
         bet_angio_bfc_path = os.path.join(bfc_derivatives_dir, sub, ses, "anat", "{}_{}_desc-angio_N4bfc_brain_mask.nii.gz".format(sub, ses))  # type: str # save path of angio brain after Brain Extraction Tool (BET)
 
-    assert os.path.exists(bet_angio_bfc_path), "path {0} does not exist".format(bet_angio_bfc_path)  # make sure that path exists
+    assert os.path.exists(bet_angio_bfc_path), "path {} does not exist".format(bet_angio_bfc_path)  # make sure that path exists
 
     # Load N4 bias-field-corrected angio volume after BET and resample to new spacing
     out_path = os.path.join(tmp_folder, "resampled_bet_tof_bfc.nii.gz")
@@ -919,23 +919,23 @@ def extract_thresholds_of_intensity_criteria(data_path, patch_side, new_spacing,
 
     if prints:
         print("\nMean-Max local intensity ratio in vesselMNI positive patches:")
-        print("5th percentile = {0}".format(q5_local_vessel_mni))
-        print("7th percentile = {0}".format(q7_local_vessel_mni))
+        print("5th percentile = {}".format(q5_local_vessel_mni))
+        print("7th percentile = {}".format(q7_local_vessel_mni))
 
         print("\nMean-Max global intensity ratio in vesselMNI positive patches:")
-        print("5th percentile = {0}".format(q5_global_vessel_mni))
-        print("7th percentile = {0}".format(q7_global_vessel_mni))
+        print("5th percentile = {}".format(q5_global_vessel_mni))
+        print("7th percentile = {}".format(q7_global_vessel_mni))
 
         print("\nMean-Max local intensity ratio in bet TOF positive patches:")
-        print("5th percentile = {0}".format(q5_local_tof_bet))
-        print("7th percentile = {0}".format(q7_local_tof_bet))
+        print("5th percentile = {}".format(q5_local_tof_bet))
+        print("7th percentile = {}".format(q7_local_tof_bet))
 
         print("\nMean-Max global intensity ratio in bet TOF positive patches:")
-        print("5th percentile = {0}".format(q5_global_tof_bet))
-        print("7th percentile = {0}".format(q7_global_tof_bet))
+        print("5th percentile = {}".format(q5_global_tof_bet))
+        print("7th percentile = {}".format(q7_global_tof_bet))
 
         print("\nNumber of non-zero voxels in vesselMNI positive patches:")
-        print("5th percentile = {0}".format(q5_nz_vessel_mni))
+        print("5th percentile = {}".format(q5_nz_vessel_mni))
 
     intensity_thresholds = [q5_local_vessel_mni, q5_global_vessel_mni, q5_local_tof_bet, q5_global_tof_bet, q5_nz_vessel_mni]
 
@@ -992,7 +992,7 @@ def refine_weak_label_one_sub(pos_path_path, masks_path):
         largest_conn_comp_binary_obj = nib.Nifti1Image(largest_conn_comp_binary, affine=aff_mat)
         nib.save(largest_conn_comp_binary_obj, os.path.join(masks_path, sub_ses_lesion, patch_pair, filename_mask))
     else:
-        raise ValueError("All white voxels were removed for {0}".format(filename_mask))
+        raise ValueError("All white voxels were removed for {}".format(filename_mask))
 
 
 def load_pickle_list_from_disk(path_to_list: str) -> List:
@@ -1063,8 +1063,8 @@ def extract_lesion_info(lesion_volume, prints=False):
                 nb_white_pixels = np.count_nonzero(lesion_volume[:, :, z])  # update max number of white pixels if there are more than the previous slice
                 idx = z  # update slice index if there are more white pixels than the previous one
     if prints:  # if prints is set to True when invoking the method
-        print("\nThe aneurysms is present in {0} different slices.".format(slices_enclosing_aneurysms))
-        print("\nThe slice with more white pixels has index {0} and contains {1} white pixels. \n".format(idx, np.count_nonzero(lesion_volume[:, :, idx])))
+        print("\nThe aneurysms is present in {} different slices.".format(slices_enclosing_aneurysms))
+        print("\nThe slice with more white pixels has index {} and contains {} white pixels. \n".format(idx, np.count_nonzero(lesion_volume[:, :, idx])))
 
     properties = regionprops(lesion_volume[:, :, idx].astype(int))  # extract properties of slice with more white pixels
 
@@ -1075,7 +1075,7 @@ def extract_lesion_info(lesion_volume, prints=False):
     cx = int(m["m10"] / m["m00"])  # calculate x coordinate of center
     cy = int(m["m01"] / m["m00"])  # calculate y coordinate of center
     if prints:  # if prints is set to True when invoking the method
-        print("The widest ROI has an equivalent diameter of {0} pixels and is approximately centered at x,y = [{1},{2}]\n".format(equiv_diameter, cx, cy))
+        print("The widest ROI has an equivalent diameter of {} pixels and is approximately centered at x,y = [{},{}]\n".format(equiv_diameter, cx, cy))
 
     # create dict fields (keys) and fill them with values
     lesion_info["slices"] = slices_enclosing_aneurysms

@@ -8,6 +8,8 @@ are extracted. For patients (subjects with aneurysm(s)), both negative (without 
 
 import time
 import os
+import sys
+sys.path.append('/home/to5743/aneurysm_project/Aneurysm_Detection/')  # this line is needed on the HPC cluster to recognize the dir as a python package
 from datetime import datetime
 import re
 from joblib import Parallel, delayed
@@ -55,9 +57,11 @@ def extract_negative_patches(subdir, n4bfc_bet_angio_path, bids_dataset_path, de
     """
     assert os.path.exists(bids_dataset_path), "Path {} does not exist".format(bids_dataset_path)  # make sure that path exists
 
-    if not os.path.exists(out_dataset_path):  # if folder doesn't exist
-        os.makedirs(out_dataset_path)  # create data_set folder with today's date in the filename
-        print("\nCreated Data Set Folder\n")
+    try:
+        os.makedirs(out_dataset_path, exist_ok=True)
+        print("Directory {} created successfully".format(out_dataset_path))
+    except OSError as error:
+        print("Directory {} can not be created".format(out_dataset_path))
 
     neg_patches_path = os.path.join(out_dataset_path, "Negative_Patches")  # type: str # create path of folder that will contain the negative patches
     vessel_mni_registration_dir = os.path.join(bids_dataset_path, "derivatives/registrations/vesselMNI_2_angioTOF/")  # type: str
@@ -234,15 +238,15 @@ def extract_positive_patches(subdir, aneurysm_mask_path, bids_dataset_path, desi
             nb_white_voxels = lesion["nb_non_zero_voxels"]
 
             # Load Mask Volume and resample it
-            out_name = "{0}_{1}_binary_mask.nii.gz".format(sub, ses)
+            out_name = "{}_{}_binary_mask.nii.gz".format(sub, ses)
             nii_mask_volume_obj, nii_mask_volume, aff_mat_nii_mask = load_nifti_and_resample(os.path.join(subdir, aneurysm_mask_path), tmp_folder, out_name, desired_spacing, binary_mask=True)
 
             # Load angio Image Volume after BET and resample it
-            out_name = "{0}_{1}_bet_tof_bfc.nii.gz".format(sub, ses)
+            out_name = "{}_{}_bet_tof_bfc.nii.gz".format(sub, ses)
             nii_volume_obj_after_bet, nii_volume_after_bet, aff_mat_after_bet = load_nifti_and_resample(bet_tof_bfc_path, tmp_folder, out_name, desired_spacing)
 
             # Load original angio Volume before BET and resample it
-            out_name = "{0}_{1}_tof_bfc.nii.gz".format(sub, ses)
+            out_name = "{}_{}_tof_bfc.nii.gz".format(sub, ses)
             nii_original_obj, nii_original, aff_mat_nii_original = load_nifti_and_resample(original_tof_bfc_path, tmp_folder, out_name, desired_spacing)
 
             # define flag that remains 0 if the lesion is small and we can create more samples around it; if instead shifting is impossible, flag will be incremented
@@ -321,7 +325,7 @@ def extract_positive_patches(subdir, aneurysm_mask_path, bids_dataset_path, desi
                                 # if the lesion was completely excluded by the BET or if we lost more than 10% (i.e. we have less than 90% of the original left) of information due to BET
                                 if np.count_nonzero(sc_patch_after_bet) == 0 or (np.count_nonzero(sc_patch_after_bet) / np.count_nonzero(sc_patch_original)) < 0.9:
                                     entered = True
-                                    print("Lesion voxels excluded by BET for {0}; therefore, extract patch from original volume".format(aneurysm_mask_path))
+                                    print("Lesion voxels excluded by BET for {}; therefore, extract patch from original volume".format(aneurysm_mask_path))
 
                             if entered is False:  # if entered is false, the lesion was not excluded by BET, thus we can use the volume after BET
                                 patch_obj_transl_scale_1 = nib.Nifti1Image(patch_after_bet_transl_scale_1, affine=aff_mat_after_bet)  # convert translated patch from numpy array to nibabel object, preserving original affine array
@@ -339,9 +343,9 @@ def extract_positive_patches(subdir, aneurysm_mask_path, bids_dataset_path, desi
                             patch_name_transl_scale_1 = '{}_{}_{}_patch_pair_{}_transl_pos_patch_angio.nii.gz'.format(sub, ses, lesion_name, n + 1)
                             nib.save(patch_obj_transl_scale_1, os.path.join(pos_patch_path, patch_name_transl_scale_1))
 
-                            print("------------ patch_pair_{0}".format(n + 1))
-                            print("Original center coord in fsleyes: [x,y,z] = [{0}, {1}, {2}]".format(x_center, y_center, z_central))
-                            print("Patches created at translated center coord: [x,y,z] = [{0}, {1}, {2}], seed = {3}".format(x_transl, y_transl, z_transl, seed))
+                            print("------------ patch_pair_{}".format(n + 1))
+                            print("Original center coord in fsleyes: [x,y,z] = [{}, {}, {}]".format(x_center, y_center, z_central))
+                            print("Patches created at translated center coord: [x,y,z] = [{}, {}, {}], seed = {}".format(x_transl, y_transl, z_transl, seed))
 
                         else:
                             print("Positive patch could not be created for {}".format(aneurysm_mask_path))
