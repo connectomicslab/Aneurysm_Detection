@@ -1,20 +1,19 @@
 # "Towards automated brain aneurysm detection in TOF-MRA: open data, weak labels, and anatomical knowledge"
 <p float="middle">
-  <img src="https://github.com/connectomicslab/Aneurysm_Detection/blob/main/images/model_prediction.png" width="250" />
+  <img src="https://github.com/connectomicslab/Aneurysm_Detection/blob/main/images/model_prediction_Nov_30_2021.png" width="335" />
   <img src="https://github.com/connectomicslab/Aneurysm_Detection/blob/main/images/anat_inf_sliding_window.png" width="340" /> 
 </p>
 
 
-This repository contains the code used for the [paper](https://arxiv.org/abs/2103.06168):
-```
-"Towards automated brain aneurysm detection in TOF-MRA: open data, weak labels, and anatomical knowledge"
-```
+This repository contains the code used for the [paper](https://arxiv.org/abs/2103.06168): "Towards automated brain aneurysm detection in TOF-MRA: open data, weak labels, and anatomical knowledge". 
+
+Please cite the paper if you are using either our dataset or model.
 
 ## Installation
 **Disclaimer**: the results of the paper were obtained with python 3.6 and a Linux (centOS) operating system. Reproducibility for different configurations is not guaranteed.
 
 ### Data
-You can download the dataset used for this study from this [OpenNEURO link](https://openneuro.org/datasets/ds003821/versions/1.0.0).
+You can download the dataset used for this study from this [OpenNEURO link](https://openneuro.org/datasets/ds003949).
 
 ### Setup conda environment
 1) Clone the repository
@@ -22,14 +21,13 @@ You can download the dataset used for this study from this [OpenNEURO link](http
 ## Usage
 **N.B.** if only interested in Inference, please skip to [Section 3 - Inference](#3-inference). Instead, to run the whole pipeline, begin from [Section 1 - Creation of training dataset](#1-creation-of-training-dataset)
 ### 1) Creation of training dataset
- The first step of the pipeline is the creation of the training dataset. This is composed of 3D TOF-MRA patches. The script used to create the dataset of patches is `create_dataset_patches_neg_and_pos.py` which is located inside the `dataset_creation` directory. Basically, the script loops over all subjects and for each of them creates training patches. For healthy controls, only negative patches (without aneurysms) are created. For patients, both negative and positive (with aneurysms) patches are created. To allow reproducibility with the results of the paper, the `dataset_creation` directory contains a config file named `config_creation_ds_patches.json`. 
- Before running the script, make sure the paths in the config file are correct. 
+ The first step of the pipeline is the creation of the training dataset. This is composed of 3D TOF-MRA patches. The script used to create the dataset of patches is `create_dataset_patches_neg_and_pos.py` which is located inside the `dataset_creation` directory. Basically, the script loops over all subjects and for each of them creates training patches. For healthy controls, only negative patches (without aneurysms) are created. For patients, both negative and positive (with aneurysms) patches are created. To allow reproducibility with the results of the paper, the `dataset_creation` directory contains a config file named `config_creation_ds_patches.json`. A detailed explanation of the input arguments can be found here. Before running the script, make sure the paths in the config file are correct. 
  
  **N.B.** also consider that running the script will generate the dataset of patches in the `out_dataset_path`. **Make sure you have at least 20 GB of free space** in `out_dataset_path`. When leaving default parameters, the dataset takes around 12 GB of disk space.
  
  Then, the script can be run with:
 ```python
-random_scramble_sessions_bids_dataset.py --config config_creation_ds_patches.json
+create_dataset_patches_neg_and_pos.py --config config_creation_ds_patches.json
 ```
 Since the dataset is created in parallel, consider increasing `jobs_in_parallel` in the config file to speed up the process (the higher, the better!). Feel free to modify the parameters inside the config file in case you would like to create a different dataset.
 ### 2) Training
