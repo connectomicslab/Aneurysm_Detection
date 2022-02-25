@@ -29,7 +29,7 @@ You can download the dataset used for this study from this [OpenNEURO link](http
 ```python
 create_dataset_patches_neg_and_pos.py --config config_creation_ds_patches.json
 ```
-Since the dataset is created in parallel, consider increasing `jobs_in_parallel` in the config file to speed up the process (the higher, the better!). Feel free to modify the parameters inside the config file in case you would like to create a different dataset.
+Since the dataset is created in parallel, consider increasing `jobs_in_parallel` in the config file to speed up the process (the higher, the better!). Feel free to modify the parameters inside the config file in case you would like to create a different dataset (e.g. different combinations of negative/positive patches).
 ### 2) Training
 The second step of the pipeline is the training of the network. The script used to start training is `network_training.py` and it is located inside the `training` directory. Similarly to step 1), the script should be run with the `config_training.json` file which is also located inside the `training` directory. In order to run this script, you must have a GPU available. Also, consider that the user must manually specify which cross-validation (CV) fold to run. This can be modified in the `config_training.json` file. Ideally, if multiple GPUs are available, you should run the same script using one GPU per CV fold, modifying the config file accordingly. Before running the script, you should modify the paths in the config files according to the previous step.
 Then, the script can be run with:
