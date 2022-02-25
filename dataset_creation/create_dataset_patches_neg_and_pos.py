@@ -407,6 +407,7 @@ def create_patch_ds(bids_dataset_path, mni_landmark_points_path, out_dataset_pat
                 all_subdirs.append(subdir)
                 all_files.append(file)
     assert all_subdirs and all_files, "Input lists must be non-empty"
+
     print("\nBegan extraction of negative patches...")
     Parallel(n_jobs=n_parallel_jobs, backend='loky')(delayed(extract_negative_patches)(all_subdirs[idx],
                                                                                        all_files[idx],
@@ -432,6 +433,7 @@ def create_patch_ds(bids_dataset_path, mni_landmark_points_path, out_dataset_pat
                 all_files.append(file)
 
     assert all_subdirs and all_files, "Input lists must be non-empty"
+
     print("\nBegan extraction of positive patches...")
     Parallel(n_jobs=n_parallel_jobs, backend='loky')(delayed(extract_positive_patches)(all_subdirs[idx],
                                                                                        all_files[idx],
