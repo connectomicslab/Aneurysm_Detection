@@ -31,7 +31,7 @@ create_dataset_patches_neg_and_pos.py --config config_creation_ds_patches.json
 ```
 Since the dataset is created in parallel, consider increasing `jobs_in_parallel` in the config file to speed up the process (the higher, the better!). Feel free to modify the parameters inside the config file in case you would like to create a different dataset (e.g. different combinations of negative/positive patches).
 ### 2) Training
-The second step of the pipeline is the training of the network. The script used to start training is `network_training.py` and it is located inside the `training` directory. Similarly to step 1), the script should be run with the `config_training.json` file which is also located inside the `training` directory. 
+The second step of the pipeline is the training of the network. The script used to start training is `network_training.py` which is located inside the `training` directory. Similarly to step 1), the script should be run with the `config_training.json` file which is also located inside the `training` directory. 
 
 **N.B.** In order to run `network_training.py`, you must have a GPU available. 
 
