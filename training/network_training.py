@@ -22,7 +22,7 @@ from matplotlib.ticker import MaxNLocator
 from joblib import Parallel, delayed
 import random
 from typing import List
-from inference.utils_inference import load_config_file, str2bool, round_half_up, load_file_from_disk, list_has_duplicates, find_common_elements
+from inference.utils_inference import load_config_file, str2bool, round_half_up, load_file_from_disk
 
 
 __author__ = "Tommaso Di Noto"
