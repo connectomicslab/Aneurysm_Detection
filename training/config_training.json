@@ -4,7 +4,6 @@
 	"batch_size": 8,
 	"lr": 0.0001,
 	"conv_filters": [9, 26, 61, 74],
-	"cross_validation_folds": 5,
 	"fold_to_do": 1,
 	"use_validation_data": "False",
 	"percentage_validation_subs": 0.2,
@@ -13,6 +12,5 @@
 	"data_path": "/path/to/dataset/of/patches",
 	"input_ds_identifier": "training_bids_dataset",
 	"path_previous_weights_for_pretraining": "/Aneurysm_Detection/extra_files/Train_Outputs_whole_adam_ds/whole_dataset/saved_models",
-	"new_added_subs": "/Aneurysm_Detection/extra_files/patients_with_voxelwise_labels.pkl",
 	"train_test_split_to_replicate": "/Aneurysm_Detection/extra_files/Forced_CV_for_reproducibility"
 }
