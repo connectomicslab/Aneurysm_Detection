@@ -6,7 +6,9 @@ This script performs the training of the cross-validation
 """
 
 import os
+import sys
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+sys.path.append('/home/to5743/aneurysm_project/Aneurysm_Detection/')  # this line is needed on the HPC cluster to recognize the dir as a python package
 import tensorflow as tf
 import time
 from datetime import datetime
@@ -20,33 +22,13 @@ from matplotlib.ticker import MaxNLocator
 from joblib import Parallel, delayed
 import random
 from typing import List
-from inference.utils_inference import load_config_file, str2bool, round_half_up
+from inference.utils_inference import load_config_file, str2bool, round_half_up, load_file_from_disk, list_has_duplicates, find_common_elements
 
 
 __author__ = "Tommaso Di Noto"
 __version__ = "0.0.1"
 __email__ = "tommydino@hotmail.it"
 __status__ = "Prototype"
-
-
-def load_pickle_list_from_disk(path_to_list: str) -> List:
-    """This function loads a list from disk
-    Args:
-        path_to_list (str): path to where the list is saved
-    Returns:
-        loaded_list (list): loaded list
-    Raises:
-        AssertionError: if list path does not exist
-        AssertionError: if extension is not .pkl
-    """
-    assert os.path.exists(path_to_list), "Path {} does not exist".format(path_to_list)
-    ext = os.path.splitext(path_to_list)[-1].lower()  # get the file extension
-    assert ext == ".pkl", "Expected .pkl file, got {} instead".format(ext)
-    open_file = open(path_to_list, "rb")
-    loaded_list = pickle.load(open_file)  # load from disk
-    open_file.close()
-
-    return loaded_list
 
 
 def split_list_equal_sized_groups(lst: list, n: int, seed: float = 123) -> List:
@@ -80,11 +62,19 @@ def save_pickle_list_to_disk(list_to_save: list, out_dir: str, out_filename: str
     open_file.close()
 
 
-def find_pairs_and_labels(pos_patch_path, neg_patch_path):
+def find_pairs_and_labels(pos_patch_path: str, neg_patch_path: str):
+    """This function extracts all the sub_ses of the dataset and also saves the corresponding label in case we want to perform some
+    sort of stratification in the cross-validation between controls and patients.
+    Args:
+        pos_patch_path (str): path to folder containing all the positive patches. Inside, there will be only sub-ses belonging to patients (i.e. subs with aneurysm(s))
+        neg_patch_path (str): path to folder containing all the negative patches. Inside, there will be sub-ses belonging to the whole cohort cause both patients and controls have negative patches
+    Returns:
+        neg_sub_ses (list): it contains the sub-ses of the whole cohort
+        label_control_vs_patient (list): it has the same length as neg_sub_ses and has value 1 for sub-ses belonging to patients, while it has value 0 for sub-ses belonging to controls
+    """
     pos_sub_ses = []
     for dirs in os.listdir(pos_patch_path):
-        sub = re.findall(r"sub-\d+", dirs)[0]
-        # ses = re.findall(r"ses-\d+", dirs)[0]
+        sub = re.findall(r"sub-\d+", dirs)[0]  # extract sub
         ses = re.findall(r"ses-\w{6}\d+", dirs)[0]  # extract ses
         sub_ses = "{}_{}".format(sub, ses)
         pos_sub_ses.append(sub_ses)
@@ -92,8 +82,7 @@ def find_pairs_and_labels(pos_patch_path, neg_patch_path):
     neg_sub_ses = []
     label_control_vs_patient = []  # type: list # will contain the labels used for the stratification of the cross-validation between controls and patients
     for folders in os.listdir(neg_patch_path):
-        sub = re.findall(r"sub-\d+", folders)[0]
-        # ses = re.findall(r"ses-\d+", folders)[0]
+        sub = re.findall(r"sub-\d+", folders)[0]  # extract sub
         ses = re.findall(r"ses-\w{6}\d+", folders)[0]  # extract ses
         sub_ses = "{}_{}".format(sub, ses)
         neg_sub_ses.append(sub_ses)
@@ -107,7 +96,7 @@ def find_pairs_and_labels(pos_patch_path, neg_patch_path):
     return neg_sub_ses, label_control_vs_patient
 
 
-def find_common_elements(list1, list2):
+def find_common_elements(list1: list, list2: list):
     """This function takes as input two lists and returns a list with the common elements
     Args:
         list1 (list): first list
@@ -734,11 +723,11 @@ def patch_wise_training(data_path, train_subs, test_subs, lambda_loss, epochs, b
     start_global = time.time()  # start timer; used to compute the time needed to run this script
     # -----------------------------------------------------------------------------------------------------------------------
     pos_patches_path = os.path.join(data_path, "Positive_Patches")  # type: str
-    assert os.path.exists(pos_patches_path), "Path {0} does not exist".format(pos_patches_path)
+    assert os.path.exists(pos_patches_path), "Path {} does not exist".format(pos_patches_path)
     pos_masks_path = os.path.join(data_path, "Positive_Patches_Masks")  # type: str
-    assert os.path.exists(pos_masks_path), "Path {0} does not exist".format(pos_masks_path)
+    assert os.path.exists(pos_masks_path), "Path {} does not exist".format(pos_masks_path)
     neg_patches_path = os.path.join(data_path, "Negative_Patches")  # type: str
-    assert os.path.exists(neg_patches_path), "Path {0} does not exist".format(neg_patches_path)
+    assert os.path.exists(neg_patches_path), "Path {} does not exist".format(neg_patches_path)
 
     # invoke external function to create output dirs
     parent_dir = str(Path(data_path).parent)  # extract parent dir of patches dataset
@@ -784,6 +773,7 @@ def patch_wise_training(data_path, train_subs, test_subs, lambda_loss, epochs, b
     unet.load_weights(os.path.join(path_previous_weights_for_pretraining, "my_checkpoint")).expect_partial()
 
     # -------------------- ADD useful callback(s): they will be fed to the fit method ----------------
+    print("\nDefining callback...")
     callbacks = []  # type: list # initialize empty list; it will store the callback(s)
     # reduce lr by 'factor' once dice stagnates. If no improvement is seen for a 'patience' number of epochs, lr is reduced.
     reduce_lr_on_plateau_cbk = tf.keras.callbacks.ReduceLROnPlateau(monitor='dice_coeff', factor=0.5, patience=50, min_lr=0.000001, verbose=1)
@@ -791,7 +781,7 @@ def patch_wise_training(data_path, train_subs, test_subs, lambda_loss, epochs, b
     # create tensorboard logs: compute activations and weight histograms every epoch for each layer of the model
     tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=tensorboard_path, histogram_freq=1)
     callbacks.append(tensorboard_callback)
-    # add checkpoint callback: it is used to save the weights of the model
+    # add checkpoint callback: it is used to save the weights of the model during training
     if use_validation_data:
         model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(filepath=model_path,
                                                                        save_weights_only=True,
@@ -807,6 +797,7 @@ def patch_wise_training(data_path, train_subs, test_subs, lambda_loss, epochs, b
     callbacks.append(model_checkpoint_callback)
 
     # ---------------------------------------- TRAIN model -------------------------------------
+    print("\nBeginning training...")
     if use_validation_data:
         model_history = unet.fit(batched_train_dataset,
                                  epochs=epochs,
@@ -844,7 +835,8 @@ def patch_wise_training(data_path, train_subs, test_subs, lambda_loss, epochs, b
 
 
 def cross_validation(data_path, lambda_loss, epochs, batch_size, lr, conv_filters, percentage_validation_subs, n_parallel_jobs, date,
-                     training_outputs_folder, fold_to_do, use_validation_data, path_previous_weights_for_pretraining, new_added_subs, train_test_split_to_replicate, cv_folds=5):
+                     training_outputs_folder, fold_to_do, use_validation_data, path_previous_weights_for_pretraining,
+                     train_test_split_to_replicate):
     """This function splits the data in train and test, ensuring that multiple sessions of the same subject are either all in train or all in test
     Args:
         data_path (str): path to dataset of patches
@@ -860,9 +852,7 @@ def cross_validation(data_path, lambda_loss, epochs, batch_size, lr, conv_filter
         fold_to_do (int): training fold that will be done
         use_validation_data (bool): if True, validation data is created to monitor the training curves
         path_previous_weights_for_pretraining (str): path where previous weights are stored (used for pretraining)
-        new_added_subs (str): path to list containing new patients added to the analysis
         train_test_split_to_replicate (str): path to directory containing the test subjects of each CV split
-        cv_folds (int): number of cross validation folds; defaults to 5
     Returns:
         None
     """
@@ -872,20 +862,15 @@ def cross_validation(data_path, lambda_loss, epochs, batch_size, lr, conv_filter
     neg_patch_path = os.path.join(data_path, "Negative_Patches")
     pos_patch_path = os.path.join(data_path, "Positive_Patches")
 
-    all_sub_ses, all_sub_ses_labels = find_pairs_and_labels(pos_patch_path, neg_patch_path)
-
-    new_added_subs_list = load_pickle_list_from_disk(new_added_subs)
-    new_added_subs_splits = split_list_equal_sized_groups(new_added_subs_list, cv_folds)
+    all_sub_ses, _ = find_pairs_and_labels(pos_patch_path, neg_patch_path)
 
     # retrieve train and test subs from previous experiment that we want to emulate
-    test_subs_previous_split = load_pickle_list_from_disk(os.path.join(train_test_split_to_replicate, "fold{}".format(fold_to_do), "test_subs", "test_sub_ses.pkl"))
-    train_subs_previous_split = [item for item in all_sub_ses if item not in test_subs_previous_split]
+    test_subs_previous_split = load_file_from_disk(os.path.join(train_test_split_to_replicate, "fold{}".format(fold_to_do), "test_subs", "test_sub_ses.pkl"))
+    train_subs_previous_split = [item for item in all_sub_ses if item not in test_subs_previous_split]  # exclude test subjects
 
-    # merge previous train with one split of the new subjects, while keep test subs untouched since we want to compare on the exact same test subjects
-    train_subs_new_split = train_subs_previous_split + new_added_subs_splits[fold_to_do - 1]
-
-    patch_wise_training(data_path, train_subs_new_split, test_subs_previous_split, lambda_loss, epochs, batch_size, lr, conv_filters,
-                        fold_to_do, date, percentage_validation_subs, n_parallel_jobs, training_outputs_folder, path_previous_weights_for_pretraining, use_validation_data)
+    patch_wise_training(data_path, train_subs_previous_split, test_subs_previous_split, lambda_loss, epochs, batch_size,
+                        lr, conv_filters, fold_to_do, date, percentage_validation_subs, n_parallel_jobs,
+                        training_outputs_folder, path_previous_weights_for_pretraining, use_validation_data)
 
 
 def main():
@@ -898,27 +883,25 @@ def main():
     batch_size = config_dict['batch_size']  # type: int
     lr = config_dict['lr']  # type: float # learning rate
     conv_filters = config_dict['conv_filters']  # type: list # number of filters in the convolutional layers
-    cross_validation_folds = config_dict['cross_validation_folds']  # type: int # number of CV folds
+    fold_to_do = config_dict['fold_to_do']  # type: int # the five folds are 1, 2, 3, 4, 5
+    use_validation_data = str2bool(config_dict['use_validation_data'])  # type: bool # whether to use validation data or not
     percentage_validation_subs = config_dict['percentage_validation_subs']   # type: float # percentage of samples to use for validation
     n_parallel_jobs = config_dict['n_parallel_jobs']  # type: int # nb. jobs to run in parallel (i.e. number of CPU (cores) to use); if set to -1, all available CPUs are used
 
     data_path = config_dict['data_path']  # type: str # path to dataset of patches
-    fold_to_do = config_dict['fold_to_do']  # type: int # the five folds are 1, 2, 3, 4, 5
-    use_validation_data = str2bool(config_dict['use_validation_data'])  # type: bool # whether to use validation data or not
     input_ds_identifier = config_dict['input_ds_identifier']  # type: str # unique name given to rename output folders
     path_previous_weights_for_pretraining = config_dict['path_previous_weights_for_pretraining']  # type: str # path where weights of an already-trained model are stored
-    new_added_subs = config_dict['data_path']  # type: str # path to pickle file containing the added subjects with voxelwise labels
     train_test_split_to_replicate = config_dict['train_test_split_to_replicate']  # type: str # path to directory containing the test subjects of each CV split
 
     date = (datetime.today().strftime('%b_%d_%Y'))  # save today's date
     training_outputs_folder = "Train_Outputs_{}_{}".format(date, input_ds_identifier)  # type: str # name of folder where all training outputs will be saved
 
     assert tf.test.is_built_with_cuda(), "TF was not built with CUDA"
-    assert tf.config.experimental.list_physical_devices('GPU'), "GPU not available"
+    assert tf.config.experimental.list_physical_devices('GPU'), "A GPU is required to run this script"
 
     # begin cross validation
     cross_validation(data_path, lambda_loss, epochs, batch_size, lr, conv_filters, percentage_validation_subs, n_parallel_jobs, date,
-                     training_outputs_folder, fold_to_do, use_validation_data, path_previous_weights_for_pretraining, new_added_subs, train_test_split_to_replicate, cv_folds=cross_validation_folds)
+                     training_outputs_folder, fold_to_do, use_validation_data, path_previous_weights_for_pretraining, train_test_split_to_replicate)
 
 
 if __name__ == '__main__':
