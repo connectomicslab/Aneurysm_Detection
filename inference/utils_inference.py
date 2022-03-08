@@ -35,7 +35,7 @@ __email__ = "tommydino@hotmail.it"
 __status__ = "Prototype"
 
 
-def create_input_lists(bids_dir):
+def create_input_lists(bids_dir: str):
     """This function creates the input lists that are used to run the patient-wise analysis in parallel
     Args:
         bids_dir (str): path to BIDS dataset folder
@@ -432,23 +432,23 @@ def extract_thresholds_of_intensity_criteria(data_path, sub_ses_test, patch_side
     if prints:
         print("\nIntensity thresholds with patch_side={}".format(patch_side))
         print("\nMean-Max local intensity ratio in vesselMNI positive patches:")
-        print("5th percentile = {0}".format(q5_local_vessel_mni))
-        print("7th percentile = {0}".format(q7_local_vessel_mni))
+        print("5th percentile = {}".format(q5_local_vessel_mni))
+        print("7th percentile = {}".format(q7_local_vessel_mni))
 
         print("\nMean-Max global intensity ratio in vesselMNI positive patches:")
-        print("5th percentile = {0}".format(q5_global_vessel_mni))
-        print("7th percentile = {0}".format(q7_global_vessel_mni))
+        print("5th percentile = {}".format(q5_global_vessel_mni))
+        print("7th percentile = {}".format(q7_global_vessel_mni))
 
         print("\nMean-Max local intensity ratio in bet TOF positive patches:")
-        print("5th percentile = {0}".format(q5_local_tof_bet))
-        print("7th percentile = {0}".format(q7_local_tof_bet))
+        print("5th percentile = {}".format(q5_local_tof_bet))
+        print("7th percentile = {}".format(q7_local_tof_bet))
 
         print("\nMean-Max global intensity ratio in bet TOF positive patches:")
-        print("5th percentile = {0}".format(q5_global_tof_bet))
-        print("7th percentile = {0}".format(q7_global_tof_bet))
+        print("5th percentile = {}".format(q5_global_tof_bet))
+        print("7th percentile = {}".format(q7_global_tof_bet))
 
         print("\nNumber of non-zero voxels in vesselMNI positive patches:")
-        print("5th percentile = {0}".format(q5_nz_vessel_mni))
+        print("5th percentile = {}".format(q5_nz_vessel_mni))
 
     intensity_thresholds = (q5_local_vessel_mni, q5_global_vessel_mni, q5_local_tof_bet, q5_global_tof_bet, q5_nz_vessel_mni)
 
