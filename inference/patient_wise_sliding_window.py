@@ -99,17 +99,19 @@ def inference_one_subject(subdir, file, bids_dir_path, sub_ses_test, unet_checkp
         shift_scale_1 = unet_patch_side // 2  # type: int # half patch side
 
         # save path of bias-field-corrected angio-TOF before BET
-        if "ADAM" in subdir:
+        if "ADAM" in subdir:  # if we are dealing with a subject from the ADAM dataset
             bfc_angio_path = os.path.join(subdir, "{}_{}_desc-angio_N4bfc_mask_ADAM.nii.gz".format(sub, ses))  # type: str # save path of bias-field-corrected angio TOF
-        else:
+        else:  # if instead we are dealing with a subject from the Lausanne dataset
             bfc_angio_path = os.path.join(subdir, "{}_{}_desc-angio_N4bfc_mask.nii.gz".format(sub, ses))  # type: str # save path of bias-field-corrected angio TOF
         assert os.path.exists(bfc_angio_path), "Path {} does not exist".format(bfc_angio_path)  # make sure path exists
+
+        # load volume with sitk
         bfc_angio_volume_sitk = sitk.ReadImage(bfc_angio_path)  # type: sitk.Image
 
         # save path of corresponding vesselMNI co-registered volume
-        if "ADAM" in vessel_mni_registration_dir:
+        if "ADAM" in vessel_mni_registration_dir:  # if we are dealing with a subject from the ADAM dataset
             vessel_mni_reg_volume_path = os.path.join(vessel_mni_registration_dir, sub, ses, "anat", "{}_{}_desc-vesselMNI2angio_deformed_ADAM.nii.gz".format(sub, ses))
-        else:
+        else:  # if instead we are dealing with a subject from the Lausanne dataset
             vessel_mni_reg_volume_path = os.path.join(vessel_mni_registration_dir, sub, ses, "anat", "{}_{}_desc-vesselMNI2angio_deformed.nii.gz".format(sub, ses))
         assert os.path.exists(vessel_mni_reg_volume_path), "Path {} does not exist".format(vessel_mni_reg_volume_path)  # make sure path exists
 
@@ -118,13 +120,15 @@ def inference_one_subject(subdir, file, bids_dir_path, sub_ses_test, unet_checkp
         assert os.path.exists(bet_bfc_angio_path), "Path {} does not exist".format(bet_bfc_angio_path)  # make sure that path exists
         bet_bfc_angio_obj = nib.load(bet_bfc_angio_path)  # type: nib.Nifti1Image
         bet_bfc_angio = np.asanyarray(bet_bfc_angio_obj.dataobj)  # type: np.ndarray
+
         # load bias-field-corrected angio volume after BET and resample
         out_name = "{}_{}_bet_tof_bfc_resampled.nii.gz".format(sub, ses)
         nii_volume_after_bet_resampled_sitk, nii_volume_obj_after_bet_resampled, nii_volume_after_bet_resampled, aff_resampled = load_nifti_and_resample(bet_bfc_angio_path,
                                                                                                                                                          tmp_path,
                                                                                                                                                          out_name,
                                                                                                                                                          new_spacing)
-        rows_range, columns_range, slices_range = nii_volume_after_bet_resampled.shape  # save dimensions of angio-BET volume
+        # save dimensions of resampled angio-BET volume
+        rows_range, columns_range, slices_range = nii_volume_after_bet_resampled.shape
         # load corresponding vesselMNI volume and resample to new spacing
         out_path = os.path.join(tmp_path, "{}_{}_resampled_vessel_atlas.nii.gz".format(sub, ses))
         _, _, vessel_mni_volume_resampled = resample_volume(vessel_mni_reg_volume_path, new_spacing, out_path)
@@ -136,10 +140,11 @@ def inference_one_subject(subdir, file, bids_dir_path, sub_ses_test, unet_checkp
         # load anatomical landmark coordinates with pandas
         df_landmarks_tof_space = pd.DataFrame()  # type: pd.DataFrame # initialize as empty dataframe; it will be modified if registration_accurate_enough == True
         if registration_accurate_enough:
-            df_landmarks = pd.read_csv(landmarks_physical_space_path)  # type: pd.DataFrame
+            df_landmarks = pd.read_csv(landmarks_physical_space_path)  # type: pd.DataFrame # load csv file
             df_landmarks_tof_space = convert_mni_to_angio(df_landmarks, bfc_angio_volume_sitk, tmp_path, mni_2_struct_mat_path,
-                                                          struct_2_tof_mat_path, mni_2_struct_inverse_warp_path)  # type: pd.DataFrame
+                                                          struct_2_tof_mat_path, mni_2_struct_inverse_warp_path)  # type: pd.DataFrame # register points from mni to subject space
 
+        # ----------------------------- begin SLIDING-WINDOW -----------------------------
         nb_samples = 0  # type: int # it's a dummy variable to count how many patches are retained for each subject
         all_angio_patches_np_list = []  # type: list # empty list; it will contain the angio patches
         patch_center_coords = []  # type: list # will containt the center coords of the retained patches after the sliding-window approach
@@ -166,17 +171,18 @@ def inference_one_subject(subdir, file, bids_dir_path, sub_ses_test, unet_checkp
                         # since registrations were performed with original (non-resampled) volumes, we need to convert the coordinate back to original angio space
                         patch_center_coordinates_physical_space = nii_volume_after_bet_resampled_sitk.TransformIndexToPhysicalPoint(patch_center_coordinates_resampled)
 
+                        # check that extracting conditions (e.g. intensity, distance-to-landmarks, not-out-of-bound) are met
                         if extracting_conditions_are_met(angio_patch_after_bet_scale_1, vessel_mni_patch, vessel_mni_volume_resampled, nii_volume_after_bet_resampled,
                                                          patch_center_coordinates_physical_space, unet_patch_side, df_landmarks_tof_space, registration_accurate_enough,
                                                          intensity_thresholds, distances_thresholds, anatomically_informed_sliding_window):
-                            # we found a good candidate patch
+                            # if all conditions are met, we found a good candidate patch
                             patch_center_coords.append(patch_center_coordinates_resampled)  # append patch center to external list
                             nb_samples += 1  # increment counter variable to keep track of how many samples are evaluated for this subject
-                            assert angio_patch_after_bet_scale_1.shape == (unet_patch_side, unet_patch_side, unet_patch_side)
+                            assert angio_patch_after_bet_scale_1.shape == (unet_patch_side, unet_patch_side, unet_patch_side), "Unexpected patch shape; expected ({},{},{})".format(unet_patch_side, unet_patch_side, unet_patch_side)
                             angio_patch_after_bet_scale_1 = tf.image.per_image_standardization(angio_patch_after_bet_scale_1)  # standardize patch to have mean 0 and variance 1
-                            all_angio_patches_np_list.append(angio_patch_after_bet_scale_1)
+                            all_angio_patches_np_list.append(angio_patch_after_bet_scale_1)  # append standardized patch to external list
 
-                            # fill mask with ones; this is just used to visualize which are the patches that were retained in the sliding-window
+                            # fill mask volume with ones; this is just used to visualize which are the patches that were retained in the sliding-window
                             retained_patches[i - shift_scale_1:i + shift_scale_1,
                                              j - shift_scale_1:j + shift_scale_1,
                                              k - shift_scale_1:k + shift_scale_1] += 1
@@ -188,6 +194,7 @@ def inference_one_subject(subdir, file, bids_dir_path, sub_ses_test, unet_checkp
 
         assert len(all_angio_patches_np_list) == nb_samples == len(patch_center_coords), "{}: mismatch between all_angio_patches_np_list, nb_samples and patch_center_coords".format(sub_ses)
         batched_dataset = create_tf_dataset(all_angio_patches_np_list, unet_batch_size)
+
         # create output folder containing aneurysm center predictions and segmentation mask
         create_output_folder(batched_dataset,
                              os.path.join(out_dir, sub, ses),
@@ -312,7 +319,6 @@ def main():
                                                                                                                                                     overlapping,
                                                                                                                                                     landmarks_physical_space_path,
                                                                                                                                                     out_final_location_dir)
-
         print("\nreg_quality_metrics_threshold = {}".format(reg_quality_metrics_threshold))
         print("intensity_thresholds = {}".format(intensity_thresholds))
         print("distances_thresholds = {}".format(distances_thresholds))
