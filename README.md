@@ -41,7 +41,7 @@ Then, the script can be run with:
 network_training.py --config config_training.json
 ```
 ### 3) Inference
-The last step of the pipeline is the patient-wise inference performed on the test subjects with the sliding-window approach. The script used to carry out inference is `patient_wise_sliding_window.py` and it is located inside the `inference` directory, together with the config file `config_inference.json`.
+The last step of the pipeline is the patient-wise inference performed on the test subjects with the sliding-window approach. The script used to carry out inference is `patient_wise_sliding_window.py` which is located inside the `inference` directory, together with the config file `config_inference.json`.
 
 If you ran the pipeline from the beginning (i.e. through steps 1) and 2)), then the `training_outputs_path` inside `config_inference.json` must correspond to the output folder that was created from [step 2)](#2-training). This output folder has been created in the same directory where the dataset of patches was created (`out_dataset_path` of [step 1)](#1-creation-of-training-dataset)) and should be named "Train_Outputs_%date_%input_ds_identifier".
 
