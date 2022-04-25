@@ -23,5 +23,5 @@
 	"ground_truth_dir": "/downloadable/from/https://drive.google.com/drive/folders/17TZiP-ieYlicDk6Fm0hh_qAel4azWQhd?usp=sharing",
 	"id_output_dir": "unique_id_for_this_run",
 	"landmarks_physical_space_path": "/Aneurysm_Detection/extra_files/Landmarks_LPS_mm_Dec_05_2020.csv",
-	"inference_outputs_path": "path/to/desired/output/folder"
+	"inference_outputs_path": "/path/to/desired/output/folder"
 }
