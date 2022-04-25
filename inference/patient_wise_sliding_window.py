@@ -266,6 +266,7 @@ def main():
     cv_folds = config_dict['cv_folds']
     anatomically_informed_sliding_window = str2bool(config_dict['anatomically_informed_sliding_window'])
     test_time_augmentation = str2bool(config_dict['test_time_augmentation'])
+    nb_parallel_jobs = config_dict['nb_parallel_jobs']
 
     # args for false positive reduction
     reduce_fp = str2bool(config_dict['reduce_fp'])
@@ -279,8 +280,6 @@ def main():
     training_outputs_path = config_dict['training_outputs_path']
     ground_truth_dir = config_dict['ground_truth_dir']
     id_output_dir = config_dict['id_output_dir']
-
-    nb_parallel_jobs = config_dict['nb_parallel_jobs']
     landmarks_physical_space_path = config_dict['landmarks_physical_space_path']
     inference_outputs_path = config_dict['inference_outputs_path']
 
