@@ -35,6 +35,17 @@ __email__ = "tommydino@hotmail.it"
 __status__ = "Prototype"
 
 
+def create_dir_if_not_exist(dir_to_create: str) -> None:
+    """This function creates the input dir if it doesn't exist.
+    Args:
+        dir_to_create (str): directory that we want to create
+    Returns:
+        None
+    """
+    if not os.path.exists(dir_to_create):  # if dir doesn't exist
+        os.makedirs(dir_to_create)  # create it
+
+
 def create_input_lists(bids_dir: str):
     """This function creates the input lists that are used to run the patient-wise analysis in parallel
     Args:
@@ -792,55 +803,6 @@ def create_tf_dataset(all_angio_patches_scale_1_numpy_list_, unet_batch_size):
     batched_dataset_ = batched_dataset_.map(lambda patches: (tf.expand_dims(patches, axis=-1)))
 
     return batched_dataset_
-
-
-def create_unet(inputs_, conv_filters):
-    """This function creates a 3D U-Net starting from an input with modifiable dimensions and it returns the compiled model
-    Args:
-        inputs_ (tf.keras.Input): input to the model; used to set the input dimensions
-        conv_filters (list): optimal number of convolutional filters found with optuna on the validation set
-    Returns:
-        model (tf.keras.Model): the U-Net
-    """
-    # DOWNWARD PATH
-    conv1 = tf.keras.layers.Conv3D(conv_filters[0], 3, activation='relu', padding='same', data_format="channels_last")(inputs_)
-    conv1 = tf.keras.layers.Conv3D(conv_filters[0], 3, activation='relu', padding='same')(conv1)
-    bn1 = tf.keras.layers.BatchNormalization()(conv1)
-    pool1 = tf.keras.layers.MaxPooling3D(pool_size=(2, 2, 2))(bn1)
-    conv2 = tf.keras.layers.Conv3D(conv_filters[1], 3, activation='relu', padding='same')(pool1)
-    conv2 = tf.keras.layers.Conv3D(conv_filters[1], 3, activation='relu', padding='same')(conv2)
-    bn2 = tf.keras.layers.BatchNormalization()(conv2)
-    pool2 = tf.keras.layers.MaxPooling3D(pool_size=(2, 2, 2))(bn2)
-    conv3 = tf.keras.layers.Conv3D(conv_filters[2], 3, activation='relu', padding='same')(pool2)
-    conv3 = tf.keras.layers.Conv3D(conv_filters[2], 3, activation='relu', padding='same')(conv3)
-    bn3 = tf.keras.layers.BatchNormalization()(conv3)
-    pool3 = tf.keras.layers.MaxPooling3D(pool_size=(2, 2, 2))(bn3)
-
-    conv4 = tf.keras.layers.Conv3D(conv_filters[3], 3, activation='relu', padding='same')(pool3)
-    conv4 = tf.keras.layers.Conv3D(conv_filters[3], 3, activation='relu', padding='same')(conv4)
-    bn4 = tf.keras.layers.BatchNormalization()(conv4)
-
-    # UPWARD PATH
-    up5 = tf.keras.layers.Conv3D(conv_filters[2], 2, activation='relu', padding='same')(tf.keras.layers.UpSampling3D(size=(2, 2, 2))(bn4))
-    merge5 = tf.keras.layers.Concatenate(axis=-1)([bn3, up5])
-    conv5 = tf.keras.layers.Conv3D(conv_filters[2], 3, activation='relu', padding='same')(merge5)
-    conv5 = tf.keras.layers.Conv3D(conv_filters[2], 3, activation='relu', padding='same')(conv5)
-    bn5 = tf.keras.layers.BatchNormalization()(conv5)
-    up6 = tf.keras.layers.Conv3D(conv_filters[1], 2, activation='relu', padding='same')(tf.keras.layers.UpSampling3D(size=(2, 2, 2))(bn5))
-    merge6 = tf.keras.layers.Concatenate(axis=-1)([bn2, up6])
-    conv6 = tf.keras.layers.Conv3D(conv_filters[1], 3, activation='relu', padding='same')(merge6)
-    conv6 = tf.keras.layers.Conv3D(conv_filters[1], 3, activation='relu', padding='same')(conv6)
-    bn6 = tf.keras.layers.BatchNormalization()(conv6)
-    up7 = tf.keras.layers.Conv3D(conv_filters[0], 2, activation='relu', padding='same')(tf.keras.layers.UpSampling3D(size=(2, 2, 2))(bn6))
-    merge7 = tf.keras.layers.Concatenate(axis=-1)([bn1, up7])
-    conv7 = tf.keras.layers.Conv3D(conv_filters[0], 3, activation='relu', padding='same')(merge7)
-    conv7 = tf.keras.layers.Conv3D(conv_filters[0], 3, activation='relu', padding='same')(conv7)
-    bn7 = tf.keras.layers.BatchNormalization()(conv7)
-    outputs_ = tf.keras.layers.Conv3D(1, 1, activation='sigmoid')(bn7)
-
-    model = tf.keras.Model(inputs=inputs_, outputs=outputs_)
-
-    return model
 
 
 def save_volume_mask_to_disk(input_volume, out_path, nii_aff, output_filename):
