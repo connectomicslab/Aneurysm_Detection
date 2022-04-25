@@ -10,20 +10,18 @@
  	"cv_folds": 5,
 	"anatomically_informed_sliding_window": "True",
 	"test_time_augmentation": "True",
+	"nb_parallel_jobs": 4,
 
  	"reduce_fp": "True",
  	"max_fp": 5,
- 
  	"reduce_fp_with_volume": "False",
  	"min_aneurysm_volume": 0.70,
-    
  	"remove_dark_fp": "False",
     
  	"bids_dir": "/path/to/BIDS/dataset/downloadable/from/OpenNEURO/",
  	"training_outputs_path": "/path/to/dir/containing/Training_Outputs",
 	"ground_truth_dir": "/downloadable/from/https://drive.google.com/drive/folders/17TZiP-ieYlicDk6Fm0hh_qAel4azWQhd?usp=sharing",
 	"id_output_dir": "unique_id_for_this_run",
-	"nb_parallel_jobs": 4,
 	"landmarks_physical_space_path": "/Aneurysm_Detection/extra_files/Landmarks_LPS_mm_Dec_05_2020.csv",
 	"inference_outputs_path": "path/to/desired/output/folder"
 }
