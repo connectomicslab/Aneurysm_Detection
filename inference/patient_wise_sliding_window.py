@@ -296,7 +296,7 @@ def main():
     id_output_dir = "{}_{}".format(id_output_dir, out_date_hours_minutes)  # add date to dataset name
     path_config_file = sys.argv[2]  # type: str # save filename
     create_dir_if_not_exist(os.path.join(inference_outputs_path, id_output_dir))
-    copyfile(path_config_file, os.path.join(inference_outputs_path, id_output_dir, "config_file.json"))
+    copyfile(path_config_file, os.path.join(inference_outputs_path, id_output_dir, "config_file.json"))  # copy config file to output dir to keep track of which were the input args
 
     # ------------------ loop over training folds of cross-validation
     metrics_cv_folds = []  # type: list # will contain the output metrics of all the subjects for each fold
