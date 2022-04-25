@@ -13,10 +13,8 @@
 
  	"reduce_fp": "True",
  	"max_fp": 5,
- 
  	"reduce_fp_with_volume": "False",
  	"min_aneurysm_volume": 0.70,
-    
  	"remove_dark_fp": "False",
     
  	"bids_dir": "/path/to/BIDS/dataset/downloadable/from/OpenNEURO/",
