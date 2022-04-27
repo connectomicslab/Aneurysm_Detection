@@ -805,16 +805,24 @@ def create_tf_dataset(all_angio_patches_scale_1_numpy_list_, unet_batch_size):
     return batched_dataset_
 
 
-def save_volume_mask_to_disk(input_volume, out_path, nii_aff, output_filename):
+def save_volume_mask_to_disk(input_volume: np.ndarray, out_path: str, nii_aff: np.ndarray, output_filename: str, output_dtype: str = "float32"):
     """This function saves "input_volume" to disk
     Args:
         input_volume (np.ndarray): volume to be saved
         out_path (str): path where the volume will be saved
         nii_aff (np.ndarray): affine matrix of volume that we want to save
         output_filename (str): name to assign to the volume we save to disk
+        output_dtype (str): data type for volume that we want to save
     Returns:
         None
     """
+    if output_dtype == "float32":
+        input_volume = np.float32(input_volume)  # cast to float32
+    elif output_dtype == "int32":
+        input_volume = np.int32(input_volume)  # cast to int32
+    else:
+        raise ValueError("Only float32 and int32 are allowed as output_dtype; got {} instead".format(output_dtype))
+
     volume_obj = nib.Nifti1Image(input_volume, nii_aff)  # convert from numpy to nib object
     if not os.path.exists(out_path):  # if output path does not exist
         os.makedirs(out_path)  # create it
@@ -855,11 +863,11 @@ def reduce_fp_in_segm_map(txt_file_path, output_folder_path, out_filename, mappi
         assert numb_labels == df_txt_file.shape[0], "Mismatch between output files: {} connected components and {} centers".format(numb_labels, df_txt_file.shape[0])
 
         # OVERWRITE previous binary mask
-        save_volume_mask_to_disk(new_segm_map, output_folder_path, binary_segm_map_obj.affine, out_filename)
+        save_volume_mask_to_disk(new_segm_map, output_folder_path, binary_segm_map_obj.affine, out_filename, output_dtype="int32")
 
     else:  # if instead the txt file is empty, we just save an empty binary mask
         # OVERWRITE previous binary mask
-        save_volume_mask_to_disk(new_segm_map, output_folder_path, binary_segm_map_obj.affine, out_filename)
+        save_volume_mask_to_disk(new_segm_map, output_folder_path, binary_segm_map_obj.affine, out_filename, output_dtype="int32")
 
 
 def resample_volume_inverse(volume_path, new_spacing, new_size, out_path, interpolator=sitk.sitkLinear):
@@ -1047,7 +1055,7 @@ def save_output_mask_and_output_location(segm_map_resampled, output_folder_path_
     # save resampled probabilistic segmentation mask to disk
     out_filename = "result.nii.gz"  # type: str # define filename of predicted binary segmentation volume
     out_filename_probabilistic = "probabilistic_result.nii.gz"   # type: str # define filename of predicted probabilistic segmentation volume
-    save_volume_mask_to_disk(segm_map_resampled, output_folder_path_, aff_mat_resampled, out_filename)
+    save_volume_mask_to_disk(segm_map_resampled, output_folder_path_, aff_mat_resampled, out_filename, output_dtype="float32")
 
     # extract voxel spacing of original (i.e. non-resampled) angio volume
     original_spacing = list(orig_bfc_angio_sitk.GetSpacing())
@@ -1063,7 +1071,7 @@ def save_output_mask_and_output_location(segm_map_resampled, output_folder_path_
                                                             interpolator=sitk.sitkNearestNeighbor)  # set near-neighb. interpolator to avoid holes in the mask
 
     # SAVE probabilistic segmentation output map in original space
-    save_volume_mask_to_disk(segm_map, output_folder_path_, segm_map_nib_obj.affine, out_filename_probabilistic)
+    save_volume_mask_to_disk(segm_map, output_folder_path_, segm_map_nib_obj.affine, out_filename_probabilistic, output_dtype="float32")
 
     # create output txt file with probabilistic segmentation mask in original (i.e. non-resampled) space
     segm_map_binary, avg_brightness_predicted_aneurysms, mapping_centers_masks = create_txt_output_file_and_remove_dark_fp(os.path.join(output_folder_path_, out_filename_probabilistic),
@@ -1076,7 +1084,7 @@ def save_output_mask_and_output_location(segm_map_resampled, output_folder_path_
     assert np.array_equal(segm_map_binary, segm_map_binary.astype(bool)), "WATCH OUT: mask is not binary in original space"
 
     # save binary output mask, OVERWRITING previous probabilistic one
-    save_volume_mask_to_disk(segm_map_binary, output_folder_path_, segm_map_nib_obj.affine, out_filename)
+    save_volume_mask_to_disk(segm_map_binary, output_folder_path_, segm_map_nib_obj.affine, out_filename, output_dtype="int32")
 
     # also remove dark FP from segmentation map
     if remove_dark_fp:
@@ -1958,7 +1966,7 @@ def load_file_from_disk(file_path):
 
 def save_sliding_window_mask_to_disk(sliding_window_mask_volume, aff_mat_resampled, output_folder_path_, orig_bfc_angio_sitk, tmp_path, out_filename="mask_sliding_window.nii.gz"):
     """This function saves the sliding-window mask to disk; this serves just for visual purposes. We want to check which are the patches that were
-    retained during inference and see if they are actually
+    retained during inference and see if they make sense from a radiological point of view
     Args:
         sliding_window_mask_volume (np.ndarray): resampled volume to save to disk; will be first brought back to original space and then saved
         aff_mat_resampled (np.ndarray): affine matrix of resampled space
@@ -1967,7 +1975,8 @@ def save_sliding_window_mask_to_disk(sliding_window_mask_volume, aff_mat_resampl
         tmp_path (str): path where we save temporary files
         out_filename (str): filename of output file
     """
-    save_volume_mask_to_disk(sliding_window_mask_volume, output_folder_path_, aff_mat_resampled, out_filename)
+    # save resampled sliding window mask
+    save_volume_mask_to_disk(sliding_window_mask_volume, output_folder_path_, aff_mat_resampled, out_filename, output_dtype="int32")
 
     # extract voxel spacing of original (i.e. non-resampled) angio volume
     original_spacing = list(orig_bfc_angio_sitk.GetSpacing())
@@ -1982,7 +1991,8 @@ def save_sliding_window_mask_to_disk(sliding_window_mask_volume, aff_mat_resampl
                                                                                                                 original_size,
                                                                                                                 out_path,
                                                                                                                 interpolator=sitk.sitkNearestNeighbor)  # set near-neighb. interpolator to avoid holes in the mask
-    save_volume_mask_to_disk(resampled_sliding_window_mask_volume, output_folder_path_, resampled_sliding_window_mask_volume_obj.affine, out_filename)
+    # SAVE mask in original space to disk (we overwrite the one in resampled space)
+    save_volume_mask_to_disk(resampled_sliding_window_mask_volume, output_folder_path_, resampled_sliding_window_mask_volume_obj.affine, out_filename, output_dtype="int32")
 
 
 def check_output_consistency_between_detection_and_segmentation(output_folder, sub, ses):
