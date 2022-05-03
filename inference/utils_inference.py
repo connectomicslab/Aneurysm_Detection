@@ -282,8 +282,7 @@ def retrieve_intensity_conditions_one_sub(subdir, aneurysm_mask_path, data_path,
 
         # create unique tmp folder where we save temporary files (this folder will be deleted at the end)
         tmp_folder = os.path.join(out_folder, "tmp_{}_{}_{}_pos_patches".format(sub, ses, lesion_name))
-        if not os.path.exists(tmp_folder):
-            os.makedirs(tmp_folder)
+        create_dir_if_not_exist(tmp_folder)  # if directory does not exist, create it
 
         # uncomment line below for debugging
         # print("{}-{}-{}".format(sub, ses, lesion_name))
@@ -581,8 +580,8 @@ def load_nifti_and_resample(volume_path, tmp_folder_, out_name, new_spacing_, bi
         aff_matrix (np.ndarray): affine matrix associated with resampled output volume
         resampled_volume_obj_sitk (sitk.Image): sitk object of resampled output volume
     """
-    if not os.path.exists(tmp_folder_):
-        os.makedirs(tmp_folder_)
+    create_dir_if_not_exist(tmp_folder_)  # if directory does not exist, create it
+
     out_path = os.path.join(tmp_folder_, out_name)
     if binary_mask:  # if the volume is a mask, use near.neighbor interpolator in order not to create new connected components
         resampled_volume_obj_sitk, resampled_volume_obj_nib, resampled_volume = resample_volume(volume_path, new_spacing_, out_path, interpolator=sitk.sitkNearestNeighbor)
@@ -621,8 +620,7 @@ def convert_angio_to_mni(original_angio_volume_sitk_, voxel_space_angio_coords, 
 
     # WRITE original angio coordinate in physical space (mm) as csv file
     csv_folder = os.path.join(tmp_path, "tmp_points_CHUV")  # specify folder where we save the csv file
-    if not os.path.exists(csv_folder):  # if path does not exist
-        os.makedirs(csv_folder)  # create it
+    create_dir_if_not_exist(csv_folder)  # if directory does not exist, create it
     csv_path = os.path.join(csv_folder, "Center_Coordinate_TOF_in_mm.csv")  # add filename to path
 
     # create csv file
@@ -824,8 +822,8 @@ def save_volume_mask_to_disk(input_volume: np.ndarray, out_path: str, nii_aff: n
         raise ValueError("Only float32 and int32 are allowed as output_dtype; got {} instead".format(output_dtype))
 
     volume_obj = nib.Nifti1Image(input_volume, nii_aff)  # convert from numpy to nib object
-    if not os.path.exists(out_path):  # if output path does not exist
-        os.makedirs(out_path)  # create it
+
+    create_dir_if_not_exist(out_path)  # if output path does not exist, create it
 
     nib.save(volume_obj, os.path.join(out_path, output_filename))  # save mask
 
@@ -1125,8 +1123,7 @@ def create_output_folder(batched_ds, output_folder_path_, unet_threshold, unet, 
     """
     # start_out_dir = time.time()
 
-    if not os.path.exists(output_folder_path_):  # if output path does not exist
-        os.makedirs(output_folder_path_)  # create it
+    create_dir_if_not_exist(output_folder_path_)  # if output path does not exist, create it
 
     # if at least one patch was retained
     if len(patch_center_coords) > 0:
@@ -1570,8 +1567,7 @@ def convert_mni_to_angio(df_landmarks, bfc_angio_volume_sitk, tmp_path, mni_2_st
 
         # WRITE landmark physical coordinate as csv file
         csv_folder = os.path.join(tmp_path, "tmp_points_CHUV_mni2tof")  # specify folder where we save the csv file
-        if not os.path.exists(csv_folder):  # if path does not exist
-            os.makedirs(csv_folder)  # create it
+        create_dir_if_not_exist(csv_folder)  # if path does not exist, create it
         csv_path = os.path.join(csv_folder, "Landmark_Coordinate_MNI_in_mm.csv")  # add filename to path
 
         # create csv file
@@ -1671,8 +1667,7 @@ def extract_distance_one_aneurysm(subdir, aneur_path, bids_path, overlapping, pa
 
         # since we are running patients in parallel, we must create separate tmp folders, otherwise we risk to overwrite/overload files of other subjects
         tmp_folder = os.path.join(out_dir, "tmp_{}_{}_{}_pos_patches".format(sub, ses, lesion_name))
-        if not os.path.exists(tmp_folder):  # if directory does not exist
-            os.makedirs(tmp_folder)  # create it
+        create_dir_if_not_exist(tmp_folder)  # if directory does not exist, create it
 
         # retrieve useful registration parameters by invoking dedicated function
         mni_2_struct_mat_path, struct_2_tof_mat_path, _, mni_2_struct_inverse_warp_path = retrieve_registration_params(os.path.join(registration_params_dir, sub, ses))
