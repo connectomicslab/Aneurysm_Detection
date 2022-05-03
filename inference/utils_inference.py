@@ -592,7 +592,7 @@ def load_nifti_and_resample(volume_path, tmp_folder_, out_name, new_spacing_, bi
     return resampled_volume_obj_sitk, resampled_volume_obj_nib, resampled_volume, aff_matrix
 
 
-def round_half_up(n, decimals=0):
+def round_half_up(n: float, decimals: int = 0):
     """This function rounds to the nearest integer number (e.g 2.4 becomes 2.0 and 2.6 becomes 3);
      in case of tie, it rounds up (e.g. 1.5 becomes 2.0 and not 1.0)
     Args:
