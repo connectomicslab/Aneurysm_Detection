@@ -16,5 +16,4 @@
 	"pos_patches": 8,
 	"refine_weak_labels": "False",
 	"convert_voxelwise_labels_into_weak": "False"
-
 }
