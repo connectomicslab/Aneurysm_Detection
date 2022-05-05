@@ -357,7 +357,7 @@ def extract_positive_patches(subdir, aneurysm_mask_path, bids_dataset_path, desi
 
 def create_patch_ds(bids_dataset_path, mni_landmark_points_path, out_dataset_path, desired_spacing, vessel_like_neg_patches, random_neg_patches,
                     landmark_patches, pos_patches, n_parallel_jobs, overlapping, subs_chuv_with_weak_labels_path, subs_chuv_with_voxelwise_labels_path,
-                    patch_side=32, refine_weak_labels=True, convert_voxelwise_labels_into_weak=False):
+                    patch_side=64, refine_weak_labels=True, convert_voxelwise_labels_into_weak=False):
     """This function creates a dataset of patches starting from the 3D angio-TOF volume. For patients, it creates both
     positive (with aneurysm) and negative (without aneurysm) patches. For controls, it only creates negative patches.
     Args:
