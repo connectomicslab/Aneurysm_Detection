@@ -588,9 +588,10 @@ def extract_vessel_like_neg_patches(nb_vessel_like_patches_per_sub, angio_min_x,
     Returns:
         seed_ext (list): it contains the random seeds used for creating the vessel-like patches; if none was created, list is empty
     """
-    assert intensity_thresholds, "intensity_thresholds list should be non-empty when extracting vessel-like patches"
     seed_ext = []  # initialize empty list where we'll store the seed used for good negative patches (i.e. the ones that fulfill all extraction criteria)
+
     for n in range(nb_vessel_like_patches_per_sub):  # repeat the extraction k times
+        assert intensity_thresholds, "intensity_thresholds list should be non-empty when extracting vessel-like patches"
         seed = 1  # start with a set random seed; this will be modified if the proposed negative patch doesn't fulfill specific requirements (see "if" statement below)
         while True:
             random_x_coord, random_y_coord, random_z_coord, random_neg_patch_vessel, \
