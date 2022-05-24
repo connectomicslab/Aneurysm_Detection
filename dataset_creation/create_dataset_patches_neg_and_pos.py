@@ -140,9 +140,10 @@ def extract_negative_patches(subdir,
             lesion_coord[aneur_path] = [x_min, x_max, y_min, y_max, z_min, z_max]  # save lesion information in external dict
 
         # extract VESSEL-LIKE negative patches
-        seed_ext = extract_vessel_like_neg_patches(nb_vessel_like_patches_per_sub, angio_min_x, angio_max_x, angio_min_y, angio_max_y, angio_min_z, angio_max_z,
-                                                   shift_scale_1, vessel_mni_volume_resampled, resampled_bfc_tof_volume, lesion_coord, patch_side, neg_patches_path,
-                                                   sub, ses, resampled_bfc_tof_aff_mat, intensity_thresholds)
+        if nb_vessel_like_patches_per_sub > 0:
+            seed_ext = extract_vessel_like_neg_patches(nb_vessel_like_patches_per_sub, angio_min_x, angio_max_x, angio_min_y, angio_max_y, angio_min_z, angio_max_z,
+                                                       shift_scale_1, vessel_mni_volume_resampled, resampled_bfc_tof_volume, lesion_coord, patch_side, neg_patches_path,
+                                                       sub, ses, resampled_bfc_tof_aff_mat, intensity_thresholds)
 
         # extract LANDMARK negative patches
         if extract_landmark_patches:  # if we want to extract the negative patches in correspondence of the landmark points
@@ -161,9 +162,10 @@ def extract_negative_patches(subdir,
         lesion_coord = {}  # since it's a control subject, initialize dict as empty
 
         # extract VESSEL-LIKE negative patches
-        seed_ext = extract_vessel_like_neg_patches(nb_vessel_like_patches_per_sub, angio_min_x, angio_max_x, angio_min_y, angio_max_y, angio_min_z, angio_max_z,
-                                                   shift_scale_1, vessel_mni_volume_resampled, resampled_bfc_tof_volume, lesion_coord, patch_side, neg_patches_path,
-                                                   sub, ses, resampled_bfc_tof_aff_mat, intensity_thresholds)
+        if nb_vessel_like_patches_per_sub > 0:
+            seed_ext = extract_vessel_like_neg_patches(nb_vessel_like_patches_per_sub, angio_min_x, angio_max_x, angio_min_y, angio_max_y, angio_min_z, angio_max_z,
+                                                       shift_scale_1, vessel_mni_volume_resampled, resampled_bfc_tof_volume, lesion_coord, patch_side, neg_patches_path,
+                                                       sub, ses, resampled_bfc_tof_aff_mat, intensity_thresholds)
 
         # extract LANDMARK patches
         if extract_landmark_patches:  # if we want to extract the negative patches in correspondence of the landmark points
@@ -175,7 +177,7 @@ def extract_negative_patches(subdir,
         n, _, random_patches_list = nb_last_created_patch(os.path.join(neg_patches_path, "{}_{}".format(sub, ses)))
         extract_random_neg_patches(n, nb_random_patches_per_sub, angio_min_x, angio_max_x, angio_min_y, angio_max_y, angio_min_z, angio_max_z, shift_scale_1,
                                    vessel_mni_volume_resampled, resampled_bfc_tof_volume, seed_ext, lesion_coord, patch_side, neg_patches_path, sub, ses,
-                                   resampled_bfc_tof_aff_mat, random_patches_list, intensity_thresholds)
+                                   resampled_bfc_tof_aff_mat, random_patches_list)
     # -------------------------------------------------------------------------------------
     # remove temporary folder for this subject
     if os.path.exists(tmp_folder) and os.path.isdir(tmp_folder):
