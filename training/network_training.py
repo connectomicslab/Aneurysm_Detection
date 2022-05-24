@@ -1,7 +1,7 @@
 """
 Created on Apr 6, 2021
 
-This script performs the training of the cross-validation
+This script performs the training of one fold of the cross-validation
 
 """
 
@@ -328,14 +328,14 @@ def create_batched_augmented_tf_dataset(pos_patches_path, subs_to_use, neg_patch
     neg_dataset, neg_patch_side, neg_buffer_size = create_dataset_negatives_parallel(neg_patches_path, subs_to_use, n_parallel_jobs)
     assert pos_patch_side == neg_patch_side, "Negative and positive samples have different dim"
 
-    if augment:
-        augm_pos_dataset, orig_plus_augm_buffer_size = augment_dataset(pos_dataset, pos_dataset)
+    if augment:  # if we want to augment the training dataset
+        augm_pos_dataset, orig_plus_augm_buffer_size = augment_dataset(pos_dataset, pos_dataset)  # we only augment the positive patches which are way less than the negatives
         buffer_size = neg_buffer_size + orig_plus_augm_buffer_size  # type: int # compute new buffer size
         print("\nThere are {} neg and {} aug pos sample ({} original and {} augmented)".format(neg_buffer_size,
                                                                                                orig_plus_augm_buffer_size,
                                                                                                pos_buffer_size,
                                                                                                orig_plus_augm_buffer_size - pos_buffer_size))
-        dataset = neg_dataset.concatenate(augm_pos_dataset)  # merge positive and negative samples into one unique dataset
+        dataset = neg_dataset.concatenate(augm_pos_dataset)  # merge negative and augmented-positive samples into one unique dataset
 
     # if instead augment is False (e.g. for the validation set), we don't perform data augmentation
     else:
