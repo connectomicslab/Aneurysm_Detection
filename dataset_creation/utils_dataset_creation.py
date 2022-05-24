@@ -215,8 +215,18 @@ def extract_lesion_info_modified(path_to_lesion, tmp_folder, new_spacing, sub_, 
     return lesion_info  # returns the dictionary with the lesion information
 
 
-def extracting_conditions_are_met(seed_, seed_ext_, lesion_coord_, x_coord, y_coord, z_coord, patch_side,
-                                  random_vessel_patch, vessel_nii_volume_resampled, random_patch_tof, resampled_tof_volume, intensity_thresholds):
+def extracting_conditions_are_met(seed_,
+                                  seed_ext_,
+                                  lesion_coord_,
+                                  x_coord,
+                                  y_coord,
+                                  z_coord,
+                                  patch_side,
+                                  random_vessel_patch,
+                                  vessel_nii_volume_resampled,
+                                  random_patch_tof,
+                                  resampled_tof_volume,
+                                  intensity_thresholds):
     """This function checks if the current candidate patch fulfills several intensity conditions.
     Args:
         seed_ (int): random seed
@@ -610,7 +620,7 @@ def extract_vessel_like_neg_patches(nb_vessel_like_patches_per_sub, angio_min_x,
 
 def extract_random_neg_patches(n, nb_random_patches_per_sub, angio_min_x, angio_max_x, angio_min_y, angio_max_y, angio_min_z, angio_max_z, shift_scale_1,
                                vessel_mni_volume_resampled, resampled_bfc_tof_volume, seed_ext, lesion_coord, patch_side, neg_patches_path, sub, ses,
-                               resampled_bfc_tof_aff_mat, random_patches_list, intensity_thresholds):
+                               resampled_bfc_tof_aff_mat, random_patches_list):
     """This function extracts some random negative patches located in the brain
     Args:
         n (int): number of last negative patch extracted for this subject
@@ -632,7 +642,6 @@ def extract_random_neg_patches(n, nb_random_patches_per_sub, angio_min_x, angio_
         ses (str): session (i.e. exam date)
         resampled_bfc_tof_aff_mat (np.ndarray): affine matrix of resampled bias field corrected tof volume
         random_patches_list (list): it contains the path to the (already created) random patches. If no patch was yet created, the list is empty
-        intensity_thresholds (list): it contains the values to use for the extraction of the vessel-like negative samples
     """
     intensity_thresholds = []  # set list to empty since we don't need intensity conditions for random patches
 
@@ -828,10 +837,8 @@ def retrieve_intensity_conditions_one_sub(subdir, aneurysm_mask_path, data_path,
                 boolean_mask_z = (range_z >= np.min(lesion_range_z)) & (range_z <= np.max(lesion_range_z))
 
                 # if ALL the three boolean masks have at least one True value
-                if np.all(boolean_mask_x == False) == False and\
-                    np.all(boolean_mask_y == False) == False and\
-                        np.all(boolean_mask_z == False) == False:
-                            flag += 1  # increment flag; if it gets incremented, it means that the current candidate patch overlaps with one aneurysm with at least one voxel
+                if np.all(boolean_mask_x == False) == False and np.all(boolean_mask_y == False) == False and np.all(boolean_mask_z == False) == False:
+                    flag += 1  # increment flag; if it gets incremented, it means that the current candidate patch overlaps with one aneurysm with at least one voxel
 
                 # ensure that the evaluated patch is not out of bound by using small scale
                 if x - shift_scale_1 >= 0 and x + shift_scale_1 < rows_range and y - shift_scale_1 >= 0 and y + shift_scale_1 < columns_range and z - shift_scale_1 >= 0 and z + shift_scale_1 < slices_range:
