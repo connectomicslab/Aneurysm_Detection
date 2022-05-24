@@ -21,7 +21,6 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from joblib import Parallel, delayed
 import random
-from typing import List
 from inference.utils_inference import load_config_file, str2bool, round_half_up, load_file_from_disk
 
 
@@ -29,21 +28,6 @@ __author__ = "Tommaso Di Noto"
 __version__ = "0.0.1"
 __email__ = "tommydino@hotmail.it"
 __status__ = "Prototype"
-
-
-def split_list_equal_sized_groups(lst: list, n: int, seed: float = 123) -> List:
-    """This function splits a list in n approximately equal-sized subgroups
-    Args:
-        lst (list): input list that we want to split
-        n (int): number of splits
-        seed (int): random seed to use; defaults to 123
-    Returns:
-        out_list (list): list of lists, where each internal list is one split
-    """
-    random.Random(seed).shuffle(lst)  # shuffle list with fixed seed
-    division = len(lst) / float(n)  # find number of items per split
-    out_list = [lst[int(round(division * i)): int(round(division * (i + 1)))] for i in range(n)]  # list of lists
-    return out_list
 
 
 def save_pickle_list_to_disk(list_to_save: list, out_dir: str, out_filename: str) -> None:
@@ -94,21 +78,6 @@ def find_pairs_and_labels(pos_patch_path: str, neg_patch_path: str):
             label_control_vs_patient.append(0)
 
     return neg_sub_ses, label_control_vs_patient
-
-
-def find_common_elements(list1: list, list2: list):
-    """This function takes as input two lists and returns a list with the common elements
-    Args:
-        list1 (list): first list
-        list2 (list): second list
-    Returns:
-        intersection_as_list (list): list containing the common elements between the two input lists
-    """
-    list1_as_set = set(list1)  # type: set
-    intersection = list1_as_set.intersection(list2)  # type: set
-    intersection_as_list = list(intersection)  # type: list
-
-    return intersection_as_list
 
 
 def define_output_folders(training_outputs_folder, ds_path_, cv_fold_numb_):
