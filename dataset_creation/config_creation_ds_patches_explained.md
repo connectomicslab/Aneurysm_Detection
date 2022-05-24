@@ -1,4 +1,4 @@
-In this file,  the input parameters of `config_creation_ds_patches.json` are explained:
+In this file, the input parameters of `config_creation_ds_patches.json` are explained:
 
 - `bids_dataset_path (str)`: path to BIDS dataset. The dataset can be downloaded from this [OpenNEURO link](https://openneuro.org/datasets/ds003821/versions/1.0.0)
 - `patch_side (int)`: side of the cubic training patches that we want to create (e.g. 64 will create 64x64x64-wide patches)
