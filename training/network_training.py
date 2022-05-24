@@ -659,8 +659,21 @@ def save_train_val_bce_curves(train_bce, val_bce, image_path_):
     fig2.savefig(image_path_)  # save the full figure
 
 
-def patch_wise_training(data_path, train_subs, test_subs, lambda_loss, epochs, batch_size, lr, conv_filters, cv_fold,
-                        date, percentage_validation_subs, n_parallel_jobs, training_outputs_folder, path_previous_weights_for_pretraining, use_validation_data):
+def patch_wise_training(data_path,
+                        train_subs,
+                        test_subs,
+                        lambda_loss,
+                        epochs,
+                        batch_size,
+                        lr,
+                        conv_filters,
+                        cv_fold,
+                        date,
+                        percentage_validation_subs,
+                        n_parallel_jobs,
+                        training_outputs_folder,
+                        path_previous_weights_for_pretraining,
+                        use_validation_data):
     """This function performs the patch-wise training
     Args:
         data_path (str): path to dataset of patches
@@ -738,8 +751,10 @@ def patch_wise_training(data_path, train_subs, test_subs, lambda_loss, epochs, b
 
     inputs = tf.keras.Input(shape=(train_patch_side, train_patch_side, train_patch_side, 1), name='TOF_patch')
     unet = create_compiled_unet(inputs, lr, lambda_loss, conv_filters)
-    # LOAD weights saved from a trained model somewhere else (we do pretraining)
-    unet.load_weights(os.path.join(path_previous_weights_for_pretraining, "my_checkpoint")).expect_partial()
+
+    if path_previous_weights_for_pretraining:  # if path to previous weights is not empty
+        # LOAD weights saved from a trained model somewhere else (we do pretraining)
+        unet.load_weights(os.path.join(path_previous_weights_for_pretraining, "my_checkpoint")).expect_partial()
 
     # -------------------- ADD useful callback(s): they will be fed to the fit method ----------------
     print("\nDefining callback...")
@@ -803,8 +818,19 @@ def patch_wise_training(data_path, train_subs, test_subs, lambda_loss, epochs, b
     print_running_time(start_global, end_global, "Running")
 
 
-def cross_validation(data_path, lambda_loss, epochs, batch_size, lr, conv_filters, percentage_validation_subs, n_parallel_jobs, date,
-                     training_outputs_folder, fold_to_do, use_validation_data, path_previous_weights_for_pretraining,
+def cross_validation(data_path,
+                     lambda_loss,
+                     epochs,
+                     batch_size,
+                     lr,
+                     conv_filters,
+                     percentage_validation_subs,
+                     n_parallel_jobs,
+                     date,
+                     training_outputs_folder,
+                     fold_to_do,
+                     use_validation_data,
+                     path_previous_weights_for_pretraining,
                      train_test_split_to_replicate):
     """This function splits the data in train and test, ensuring that multiple sessions of the same subject are either all in train or all in test
     Args:
@@ -820,7 +846,7 @@ def cross_validation(data_path, lambda_loss, epochs, batch_size, lr, conv_filter
         n_parallel_jobs (int): number of jobs to run in parallel
         fold_to_do (int): training fold that will be done
         use_validation_data (bool): if True, validation data is created to monitor the training curves
-        path_previous_weights_for_pretraining (str): path where previous weights are stored (used for pretraining)
+        path_previous_weights_for_pretraining (str): path where previous weights are stored (used for pretraining); if empty, no pretraining is done
         train_test_split_to_replicate (str): path to directory containing the test subjects of each CV split
     Returns:
         None
@@ -837,9 +863,21 @@ def cross_validation(data_path, lambda_loss, epochs, batch_size, lr, conv_filter
     test_subs_previous_split = load_file_from_disk(os.path.join(train_test_split_to_replicate, "fold{}".format(fold_to_do), "test_subs", "test_sub_ses.pkl"))
     train_subs_previous_split = [item for item in all_sub_ses if item not in test_subs_previous_split]  # exclude test subjects
 
-    patch_wise_training(data_path, train_subs_previous_split, test_subs_previous_split, lambda_loss, epochs, batch_size,
-                        lr, conv_filters, fold_to_do, date, percentage_validation_subs, n_parallel_jobs,
-                        training_outputs_folder, path_previous_weights_for_pretraining, use_validation_data)
+    patch_wise_training(data_path,
+                        train_subs_previous_split,
+                        test_subs_previous_split,
+                        lambda_loss,
+                        epochs,
+                        batch_size,
+                        lr,
+                        conv_filters,
+                        fold_to_do,
+                        date,
+                        percentage_validation_subs,
+                        n_parallel_jobs,
+                        training_outputs_folder,
+                        path_previous_weights_for_pretraining,
+                        use_validation_data)
 
 
 def main():
@@ -859,7 +897,7 @@ def main():
 
     data_path = config_dict['data_path']  # type: str # path to dataset of patches
     input_ds_identifier = config_dict['input_ds_identifier']  # type: str # unique name given to rename output folders
-    path_previous_weights_for_pretraining = config_dict['path_previous_weights_for_pretraining']  # type: str # path where weights of an already-trained model are stored
+    path_previous_weights_for_pretraining = config_dict['path_previous_weights_for_pretraining']  # type: str # path where weights of an already-trained model are stored; if empty, there is no pretraining
     train_test_split_to_replicate = config_dict['train_test_split_to_replicate']  # type: str # path to directory containing the test subjects of each CV split
 
     date = (datetime.today().strftime('%b_%d_%Y'))  # save today's date
@@ -869,8 +907,20 @@ def main():
     assert tf.config.experimental.list_physical_devices('GPU'), "A GPU is required to run this script"
 
     # begin cross validation
-    cross_validation(data_path, lambda_loss, epochs, batch_size, lr, conv_filters, percentage_validation_subs, n_parallel_jobs, date,
-                     training_outputs_folder, fold_to_do, use_validation_data, path_previous_weights_for_pretraining, train_test_split_to_replicate)
+    cross_validation(data_path,
+                     lambda_loss,
+                     epochs,
+                     batch_size,
+                     lr,
+                     conv_filters,
+                     percentage_validation_subs,
+                     n_parallel_jobs,
+                     date,
+                     training_outputs_folder,
+                     fold_to_do,
+                     use_validation_data,
+                     path_previous_weights_for_pretraining,
+                     train_test_split_to_replicate)
 
 
 if __name__ == '__main__':
