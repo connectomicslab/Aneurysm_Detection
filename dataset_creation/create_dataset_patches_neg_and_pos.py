@@ -31,8 +31,17 @@ __email__ = "tommydino@hotmail.it"
 __status__ = "Prototype"
 
 
-def extract_negative_patches(subdir, n4bfc_bet_angio_path, bids_dataset_path, desired_spacing, out_dataset_path, mni_landmark_points_path, intensity_thresholds,
-                             extract_landmark_patches=True, nb_vessel_like_patches_per_sub=20, nb_random_patches_per_sub=0, patch_side=32):
+def extract_negative_patches(subdir,
+                             n4bfc_bet_angio_path,
+                             bids_dataset_path,
+                             desired_spacing,
+                             out_dataset_path,
+                             mni_landmark_points_path,
+                             intensity_thresholds,
+                             extract_landmark_patches=True,
+                             nb_vessel_like_patches_per_sub=20,
+                             nb_random_patches_per_sub=0,
+                             patch_side=64):
     """This function extracts negative patches from all subjects. For patients (subjects with aneurysm(s)), negative patches are only extracted if there is no overlap with an aneurysm
     Args:
         subdir (str): path to parent folder of n4bfc_angio_bet
@@ -145,7 +154,7 @@ def extract_negative_patches(subdir, n4bfc_bet_angio_path, bids_dataset_path, de
         n, _, random_patches_list = nb_last_created_patch(os.path.join(neg_patches_path, "{}_{}".format(sub, ses)))
         extract_random_neg_patches(n, nb_random_patches_per_sub, angio_min_x, angio_max_x, angio_min_y, angio_max_y, angio_min_z, angio_max_z, shift_scale_1,
                                    vessel_mni_volume_resampled, resampled_bfc_tof_volume, seed_ext, lesion_coord, patch_side, neg_patches_path, sub, ses,
-                                   resampled_bfc_tof_aff_mat, random_patches_list, intensity_thresholds)
+                                   resampled_bfc_tof_aff_mat, random_patches_list)
 
     else:  # if list is empty --> we're dealing with a control subject (i.e. subject without aneurysm(s))
         print("\n-------------------------- {}_{} --------------------------".format(sub, ses))
@@ -173,7 +182,13 @@ def extract_negative_patches(subdir, n4bfc_bet_angio_path, bids_dataset_path, de
         shutil.rmtree(tmp_folder)
 
 
-def extract_positive_patches(subdir, aneurysm_mask_path, bids_dataset_path, desired_spacing, out_dataset_path, nb_pos_patches_per_sub=5, patch_side=32):
+def extract_positive_patches(subdir,
+                             aneurysm_mask_path,
+                             bids_dataset_path,
+                             desired_spacing,
+                             out_dataset_path,
+                             nb_pos_patches_per_sub=5,
+                             patch_side=64):
     """This function extracts positive patches for each patient (subject with aneurysm(s)). Positive patches are extracted as random shifts around the aneurysm center
     Args:
         subdir (str): path to parent folder of aneurysm_mask_path
@@ -182,7 +197,7 @@ def extract_positive_patches(subdir, aneurysm_mask_path, bids_dataset_path, desi
         desired_spacing (list): list containing the desired voxel spacing for resampling the input volumes
         out_dataset_path (str): path to folder where we create the output dataset
         nb_pos_patches_per_sub (int): number of positive patches to extract for each patient; defaults to 5
-        patch_side (int): side of cubic patches that will be extracted; defaults to 32 (voxels)
+        patch_side (int): side of cubic patches that will be extracted; defaults to 64 (voxels)
     Returns:
         None
     Raises:
@@ -359,9 +374,21 @@ def extract_positive_patches(subdir, aneurysm_mask_path, bids_dataset_path, desi
             shutil.rmtree(tmp_folder)
 
 
-def create_patch_ds(bids_dataset_path, mni_landmark_points_path, out_dataset_path, desired_spacing, vessel_like_neg_patches, random_neg_patches,
-                    landmark_patches, pos_patches, n_parallel_jobs, overlapping, subs_chuv_with_weak_labels_path, subs_chuv_with_voxelwise_labels_path,
-                    patch_side=64, refine_weak_labels=True, convert_voxelwise_labels_into_weak=False):
+def create_patch_ds(bids_dataset_path,
+                    mni_landmark_points_path,
+                    out_dataset_path,
+                    desired_spacing,
+                    vessel_like_neg_patches,
+                    random_neg_patches,
+                    landmark_patches,
+                    pos_patches,
+                    n_parallel_jobs,
+                    overlapping,
+                    subs_chuv_with_weak_labels_path,
+                    subs_chuv_with_voxelwise_labels_path,
+                    patch_side=64,
+                    refine_weak_labels=True,
+                    convert_voxelwise_labels_into_weak=False):
     """This function creates a dataset of patches starting from the 3D angio-TOF volume. For patients, it creates both
     positive (with aneurysm) and negative (without aneurysm) patches. For controls, it only creates negative patches.
     Args:
