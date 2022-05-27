@@ -82,7 +82,7 @@ def inference_one_subject(subdir, file, bids_dir_path, sub_ses_test, unet_checkp
 
     # ------------------- only evaluate on test subjects for this cross-validation split -------------------
     if sub_ses in sub_ses_test:
-        # check if output dir exists before starting inference
+        # check if output dir exists before starting inference; if it already exists, it means we already ran inference for this sub_ses
         if not os.path.exists(os.path.join(out_dir, sub, ses)):
             # uncomment line below for debugging
             # print("\nRunning inference on {}_{}".format(sub, ses))
@@ -247,7 +247,10 @@ def inference_one_subject(subdir, file, bids_dir_path, sub_ses_test, unet_checkp
 
         # if instead output dir already exists
         else:
-            print("\n{}_{} already done".format(sub, ses))
+            if len(os.listdir(os.path.join(out_dir, sub, ses))) > 0:  # if the folder is not empty
+                print("\n{}_{} already done".format(sub, ses))
+            else:
+                raise ValueError("Output dir exists but it's empty for {}_{}".format(sub, ses))
 
 
 def main():
@@ -275,9 +278,17 @@ def main():
     min_aneurysm_volume = config_dict['min_aneurysm_volume']
     remove_dark_fp = str2bool(config_dict['remove_dark_fp'])
 
-    # args for paths
-    bids_dir = config_dict['bids_dir']
+    # args for in-house CHUV paths
+    bids_dir = config_dict['bids_dir_inhouse']
+    all_test_sub_ses_inhouse = config_dict['all_test_sub_ses_inhouse']
     training_outputs_path = config_dict['training_outputs_path']
+
+    # args for ADAM paths
+    only_pretrain_on_adam = str2bool(config_dict['only_pretrain_on_adam'])
+    bids_dir_adam = config_dict['bids_dir_adam']
+    training_outputs_path_adam = config_dict['training_outputs_path_adam']
+
+    # general args
     ground_truth_dir = config_dict['ground_truth_dir']
     id_output_dir = config_dict['id_output_dir']
     landmarks_physical_space_path = config_dict['landmarks_physical_space_path']
@@ -303,9 +314,17 @@ def main():
     out_date = (datetime.today().strftime('%b_%d_%Y'))  # type: str # save today's date
     for cv_fold in range(1, cv_folds + 1):
         print("\nBegan fold {}".format(cv_fold))
-        test_subs_path = os.path.join(training_outputs_path, "fold{}".format(cv_fold), "test_subs", "test_sub_ses.pkl")  # type: str # load test subjects of this CV fold
-        unet_checkpoint_path = os.path.join(training_outputs_path, "fold{}".format(cv_fold), "saved_models")  # type: str
-        out_final_location_dir = os.path.join(inference_outputs_path, id_output_dir, "fold_{}_inference_{}").format(cv_fold, out_date)  # type: str
+        if only_pretrain_on_adam:  # if we load weights from a model only pre-trained on ADAM (i.e. which was not finetuned on the in-house dataset)
+            unet_checkpoint_path = os.path.join(training_outputs_path_adam, "whole_dataset", "saved_models")  # type: str
+            sub_ses_test = load_file_from_disk(all_test_sub_ses_inhouse)
+            out_final_location_dir = os.path.join(inference_outputs_path, id_output_dir, "all_folds_inference_{}").format(cv_fold, out_date)  # type: str
+        else:  # if instead we load weights from a model pre-trained on ADAM and then finetuned on in-house
+            unet_checkpoint_path = os.path.join(training_outputs_path, "fold{}".format(cv_fold), "saved_models")  # type: str
+            test_subs_path = os.path.join(training_outputs_path, "fold{}".format(cv_fold), "test_subs", "test_sub_ses.pkl")  # type: str # load test subjects of this CV fold
+            sub_ses_test = load_file_from_disk(test_subs_path)  # type: list # load test subjects for this cross-validation split
+            out_final_location_dir = os.path.join(inference_outputs_path, id_output_dir, "fold_{}_inference_{}").format(cv_fold, out_date)  # type: str
+
+        assert os.path.exists(unet_checkpoint_path), "Path {} does not exist".format(unet_checkpoint_path)
 
         # --------------------------------------- create network and load weights
         # define input and create U-Net model
@@ -315,8 +334,6 @@ def main():
         # LOAD weights saved from a trained model somewhere else
         unet.load_weights(os.path.join(unet_checkpoint_path, "my_checkpoint")).expect_partial()
 
-        # --------------------------------------- load test subjects for this cross-validation split -----------------------
-        sub_ses_test = load_file_from_disk(test_subs_path)  # type: list
         # --------------- compute thresholds for anatomically-informed sliding-window
         reg_quality_metrics_threshold, intensity_thresholds, distances_thresholds, dark_fp_threshold = extract_thresholds_for_anatomically_informed(bids_dir,
                                                                                                                                                     sub_ses_test,
@@ -326,7 +343,10 @@ def main():
                                                                                                                                                     nb_parallel_jobs,
                                                                                                                                                     overlapping,
                                                                                                                                                     landmarks_physical_space_path,
-                                                                                                                                                    out_final_location_dir)
+                                                                                                                                                    out_final_location_dir,
+                                                                                                                                                    only_pretrain_on_adam,
+                                                                                                                                                    bids_dir_adam)
+
         print("\nreg_quality_metrics_threshold = {}".format(reg_quality_metrics_threshold))
         print("intensity_thresholds = {}".format(intensity_thresholds))
         print("distances_thresholds = {}".format(distances_thresholds))
