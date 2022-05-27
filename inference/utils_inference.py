@@ -1163,7 +1163,7 @@ def check_registration_quality(quality_metrics_thresholds, sub_quality_metrics):
 def get_result_filename_coord_file(dirname):
     """Find the filename of the result coordinate file.
 
-    This should be result.txt  If this file is not present,
+    This should be result.txt If this file is not present,
     it tries to find the closest filename."""
 
     files = os.listdir(dirname)
