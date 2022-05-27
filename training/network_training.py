@@ -754,7 +754,10 @@ def patch_wise_training(data_path,
 
     if path_previous_weights_for_pretraining:  # if path to previous weights is not empty
         # LOAD weights saved from a trained model somewhere else (we do pretraining)
+        print("\nLoading weights from a previous model...")
         unet.load_weights(os.path.join(path_previous_weights_for_pretraining, "my_checkpoint")).expect_partial()
+    else:  # if instead path to previous weights is empty
+        print("\nTraining from scratch...")
 
     # -------------------- ADD useful callback(s): they will be fed to the fit method ----------------
     print("\nDefining callback...")
@@ -787,7 +790,7 @@ def patch_wise_training(data_path,
                                  epochs=epochs,
                                  validation_data=batched_validation_dataset,
                                  callbacks=callbacks)
-    else:
+    else:  # if we don't use any validation data
         model_history = unet.fit(batched_train_dataset,
                                  epochs=epochs,
                                  callbacks=callbacks)
