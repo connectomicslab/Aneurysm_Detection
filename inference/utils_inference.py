@@ -27,6 +27,7 @@ import cv2
 import pickle
 import argparse
 import json
+from dataset_creation.utils_dataset_creation import extract_lesion_info_modified
 
 
 __author__ = "Tommaso Di Noto"
@@ -105,7 +106,7 @@ def extract_registration_quality_metrics(bids_ds_path, sub_ses_test):
     return p3_neigh_corr_struct_2_tof, p97_mut_inf_struct_2_tof
 
 
-def extract_lesion_info(path_to_lesion: str, prints=False):
+def extract_lesion_info_inference(path_to_lesion: str, prints=False):
     """This function takes as input the path of a binary volumetric mask, loops through the slices which have some non-zero pixels and returns some information about the entire lesion: i.e.
     number of slices enclosing the lesion, index of slice with more white pixels, the equivalent diameter of the lesion width in that specific slice, and the coordinates of the
     centroid of the lesion. If "prints" is set to True, the method also prints this information."""
@@ -116,7 +117,7 @@ def extract_lesion_info(path_to_lesion: str, prints=False):
     if len(lesion_volume.shape) != 3:  # if the numpy array is not 3D
         lesion_volume = np.squeeze(lesion_volume, axis=3)  # we drop the fourth dimension (time dimension) which is useless in our case
 
-    assert np.array_equal(lesion_volume, lesion_volume.astype(bool)), "WATCH OUT: mask is not binary for {0}".format(path_to_lesion)
+    assert np.array_equal(lesion_volume, lesion_volume.astype(bool)), "WATCH OUT: mask is not binary for {}".format(path_to_lesion)
     assert np.count_nonzero(lesion_volume) > 0, "WATCH OUT: mask is empty (i.e. all zero-voxels)"
 
     labels_out = cc3d.connected_components(np.asarray(lesion_volume, dtype=int))
@@ -135,8 +136,8 @@ def extract_lesion_info(path_to_lesion: str, prints=False):
                 nb_white_pixels = np.count_nonzero(lesion_volume[:, :, z])  # update max number of white pixels if there are more than the previous slice
                 idx = z  # update slice index if there are more white pixels than the previous one
     if prints:  # if prints is set to True when invoking the method
-        print("\nThe aneurysms is present in {0} different slices.".format(slices_enclosing_aneurysms))
-        print("\nThe slice with more white pixels has index {0} and contains {1} white pixels. \n".format(idx, np.count_nonzero(lesion_volume[:, :, idx])))
+        print("\nThe aneurysms is present in {} different slices.".format(slices_enclosing_aneurysms))
+        print("\nThe slice with more white pixels has index {} and contains {} white pixels. \n".format(idx, np.count_nonzero(lesion_volume[:, :, idx])))
 
     properties = regionprops(lesion_volume[:, :, idx].astype(int))  # extract properties of slice with more white pixels
 
@@ -147,7 +148,7 @@ def extract_lesion_info(path_to_lesion: str, prints=False):
     cX = int(m["m10"] / m["m00"])  # calculate x coordinate of center
     cY = int(m["m01"] / m["m00"])  # calculate y coordinate of center
     if prints:  # if prints is set to True when invoking the method
-        print("The widest ROI has an equivalent diameter of {0} pixels and is approximately centered at x,y = [{1},{2}]\n".format(equiv_diameter, cX, cY))
+        print("The widest ROI has an equivalent diameter of {} pixels and is approximately centered at x,y = [{},{}]\n".format(equiv_diameter, cX, cY))
 
     # create dict fields (keys) and fill them with values
     lesion_info["slices"] = slices_enclosing_aneurysms
@@ -155,76 +156,6 @@ def extract_lesion_info(path_to_lesion: str, prints=False):
     lesion_info["equivalent_diameter"] = equiv_diameter
     lesion_info["centroid_x_coord"] = cX
     lesion_info["centroid_y_coord"] = cY
-    lesion_info["widest_dimension"] = slices_enclosing_aneurysms if slices_enclosing_aneurysms > equiv_diameter else equiv_diameter  # save biggest dimension between the two
-    lesion_info["nb_non_zero_voxels"] = sum(tot_nb_white_pixels)  # sum all elements inside list
-
-    return lesion_info  # returns the dictionary with the lesion information
-
-
-def extract_lesion_info_modified(path_to_lesion, tmp_folder, new_spacing, sub_, ses_, prints=False):
-    """This function takes as input the path of a binary volumetric mask, loops through the slices which have some non-zero pixels and returns
-    some information about the entire lesion: i.e. number of slices enclosing the lesion, index of slice with more white pixels, the equivalent
-    diameter of the lesion width in that specific slice, and the coordinates of the centroid of the lesion. If "prints" is set to True, the
-    function also prints this information.
-    Args:
-        path_to_lesion (str): path to the binary mask of the aneurysm
-        tmp_folder (str): path to folder where we temporarily save the resampled volumes
-        new_spacing (list): desired voxel spacing
-        sub_ (str): subject of interest
-        ses_ (str): session of interest
-        prints (bool): defaults to False. If set to True, it prints some information about the lesion
-    Returns:
-        lesion_info (dict): it contains some info/metrics about the lesion
-    Raises:
-        AssertionError: if the binary mask is either non-binary or full of zeros
-        AssertionError: if the binary mask has more than 1 connected component
-    """
-    lesion_info = {}  # initialize empty dict; this will be the output of the function
-    out_path_ = os.path.join(tmp_folder, "{0}_{1}_mask.nii.gz".format(sub_, ses_))
-    # resample lesion mask. N.B. interpolator is set to NearestNeighbor so we are sure that we don't create new connected components
-    _, _, lesion_volume = resample_volume(path_to_lesion, new_spacing, out_path_, interpolator=sitk.sitkNearestNeighbor)
-    if len(lesion_volume.shape) == 4:  # if the numpy array is not 3D
-        lesion_volume = np.squeeze(lesion_volume, axis=3)  # we drop the fourth dimension (time dimension) which is useless in our case
-
-    assert np.array_equal(lesion_volume, lesion_volume.astype(bool)), "WATCH OUT: mask is not binary for {0}".format(path_to_lesion)
-    assert np.count_nonzero(lesion_volume) > 0, "WATCH OUT: mask is empty (i.e. all zero-voxels)"
-
-    labels_out = cc3d.connected_components(np.asarray(lesion_volume, dtype=int))
-    numb_labels = np.max(labels_out)  # extract number of different connected components found
-    assert numb_labels == 1, "This function is intended for binary masks that only contain ONE lesion."
-
-    slices_enclosing_aneurysms = 0  # it's gonna be the number of slices that enclose the aneurysm
-    idx = 0  # it's gonna be the index of the slice with the biggest lesion (the biggest number of white pixels)
-    nb_white_pixels = 0
-    tot_nb_white_pixels = []  # type: list # will contain the number of white pixels for each non-empty slice
-    for z in range(0, lesion_volume.shape[2]):  # z will be the index of the slices
-        if np.sum(lesion_volume[:, :, z]) != 0:  # if the sum of the pixels is different than zero (i.e. if there's at least one white pixel)
-            slices_enclosing_aneurysms += 1  # increment
-            tot_nb_white_pixels.append(np.count_nonzero(lesion_volume[:, :, z]))
-            if np.count_nonzero(lesion_volume[:, :, z]) > nb_white_pixels:  # for the first iteration, we compare to 0, so the if is always verified if there's at least one non-zero pixel
-                nb_white_pixels = np.count_nonzero(lesion_volume[:, :, z])  # update max number of white pixels if there are more than the previous slice
-                idx = z  # update slice index if there are more white pixels than the previous one
-    if prints:  # if prints is set to True when invoking the method
-        print("\nThe aneurysms is present in {0} different slices.".format(slices_enclosing_aneurysms))
-        print("\nThe slice with more white pixels has index {0} and contains {1} white pixels. \n".format(idx, np.count_nonzero(lesion_volume[:, :, idx])))
-
-    properties = regionprops(lesion_volume[:, :, idx].astype(int))  # extract properties of slice with more white pixels
-
-    for p in properties:
-        equiv_diameter = np.array(p.equivalent_diameter).astype(int)  # we save the diameter of a circle with the same area as our ROI (we save it as int for simplicity)
-
-    m = cv2.moments(lesion_volume[:, :, idx])  # calculate moments of binary image
-    cx = int(m["m10"] / m["m00"])  # calculate x coordinate of center
-    cy = int(m["m01"] / m["m00"])  # calculate y coordinate of center
-    if prints:  # if prints is set to True when invoking the method
-        print("The widest ROI has an equivalent diameter of {0} pixels and is approximately centered at x,y = [{1},{2}]\n".format(equiv_diameter, cx, cy))
-
-    # create dict fields (keys) and fill them with values
-    lesion_info["slices"] = slices_enclosing_aneurysms
-    lesion_info["idx_slice_with_more_white_pixels"] = idx
-    lesion_info["equivalent_diameter"] = equiv_diameter
-    lesion_info["centroid_x_coord"] = cx
-    lesion_info["centroid_y_coord"] = cy
     lesion_info["widest_dimension"] = slices_enclosing_aneurysms if slices_enclosing_aneurysms > equiv_diameter else equiv_diameter  # save biggest dimension between the two
     lesion_info["nb_non_zero_voxels"] = sum(tot_nb_white_pixels)  # sum all elements inside list
 
@@ -251,11 +182,11 @@ def retrieve_intensity_conditions_one_sub(subdir, aneurysm_mask_path, data_path,
         AssertionError: if the session (i.e. exam date) was not found
         AssertionError: if the lesion name was not found
     """
-    assert os.path.exists(data_path), "path {0} does not exist".format(data_path)
+    assert os.path.exists(data_path), "path {} does not exist".format(data_path)
     vessel_mni_registration_dir = os.path.join(data_path, "derivatives", "registrations", "vesselMNI_2_angioTOF")
-    assert os.path.exists(vessel_mni_registration_dir), "path {0} does not exist".format(vessel_mni_registration_dir)  # make sure that path exists
+    assert os.path.exists(vessel_mni_registration_dir), "path {} does not exist".format(vessel_mni_registration_dir)  # make sure that path exists
     bfc_derivatives_dir = os.path.join(data_path, "derivatives", "N4_bias_field_corrected")
-    assert os.path.exists(bfc_derivatives_dir), "path {0} does not exist".format(bfc_derivatives_dir)  # make sure that path exists
+    assert os.path.exists(bfc_derivatives_dir), "path {} does not exist".format(bfc_derivatives_dir)  # make sure that path exists
 
     shift_scale_1 = patch_side // 2
 
@@ -289,16 +220,16 @@ def retrieve_intensity_conditions_one_sub(subdir, aneurysm_mask_path, data_path,
 
         # save path of corresponding vesselMNI co-registered volume
         if "ADAM" in subdir:
-            vessel_mni_reg_volume_path = os.path.join(vessel_mni_registration_dir, sub, ses, "anat", "{0}_{1}_desc-vesselMNI2angio_deformed_ADAM.nii.gz".format(sub, ses))
+            vessel_mni_reg_volume_path = os.path.join(vessel_mni_registration_dir, sub, ses, "anat", "{}_{}_desc-vesselMNI2angio_deformed_ADAM.nii.gz".format(sub, ses))
         else:
-            vessel_mni_reg_volume_path = os.path.join(vessel_mni_registration_dir, sub, ses, "anat", "{0}_{1}_desc-vesselMNI2angio_deformed.nii.gz".format(sub, ses))
+            vessel_mni_reg_volume_path = os.path.join(vessel_mni_registration_dir, sub, ses, "anat", "{}_{}_desc-vesselMNI2angio_deformed.nii.gz".format(sub, ses))
         assert os.path.exists(vessel_mni_reg_volume_path), "Path {} does not exist".format(vessel_mni_reg_volume_path)
 
         if "ADAM" in subdir:
             bet_angio_bfc_path = os.path.join(bfc_derivatives_dir, sub, ses, "anat", "{}_{}_desc-angio_N4bfc_brain_mask_ADAM.nii.gz".format(sub, ses))  # type: str # save path of angio brain after Brain Extraction Tool (BET)
         else:
             bet_angio_bfc_path = os.path.join(bfc_derivatives_dir, sub, ses, "anat", "{}_{}_desc-angio_N4bfc_brain_mask.nii.gz".format(sub, ses))  # type: str # save path of angio brain after Brain Extraction Tool (BET)
-        assert os.path.exists(bet_angio_bfc_path), "path {0} does not exist".format(bet_angio_bfc_path)  # make sure that path exists
+        assert os.path.exists(bet_angio_bfc_path), "path {} does not exist".format(bet_angio_bfc_path)  # make sure that path exists
 
         # Load N4 bias-field-corrected angio volume after BET and resample to new spacing
         out_path = os.path.join(tmp_folder, "resampled_bet_tof_bfc.nii.gz")
@@ -499,7 +430,7 @@ def retrieve_registration_params(registration_dir_):
         AssertionError: if input path does not exist
         AssertionError: if more (or less) than 4 registration paths are retrieved
     """
-    assert os.path.exists(registration_dir_), "Path {0} does not exist".format(registration_dir_)
+    assert os.path.exists(registration_dir_), "Path {} does not exist".format(registration_dir_)
     extension_mat = '.mat'  # type: str # set file extension to be matched
     extension_gz = '.gz'  # type: str # set file extension to be matched
     cnt = 0  # type: int # counter variable that we use to ensure that exactly 4 registration parameters were retrieved
@@ -1657,13 +1588,13 @@ def extract_distance_one_aneurysm(subdir, aneur_path, bids_path, overlapping, pa
         registration_params_dir = os.path.join(bids_path, "derivatives", "registrations", "reg_params")
         assert os.path.exists(registration_params_dir), "Path {} does not exist".format(registration_params_dir)
         bfc_derivatives_dir = os.path.join(bids_path, "derivatives", "N4_bias_field_corrected")
-        assert os.path.exists(bfc_derivatives_dir), "path {0} does not exist".format(bfc_derivatives_dir)  # make sure that path exists
+        assert os.path.exists(bfc_derivatives_dir), "path {} does not exist".format(bfc_derivatives_dir)  # make sure that path exists
 
         if "ADAM" in bfc_derivatives_dir:
             bet_angio_bfc_path = os.path.join(bfc_derivatives_dir, sub, ses, "anat", "{}_{}_desc-angio_N4bfc_brain_mask_ADAM.nii.gz".format(sub, ses))  # type: str # save path of angio brain after Brain Extraction Tool (BET)
         else:
             bet_angio_bfc_path = os.path.join(bfc_derivatives_dir, sub, ses, "anat", "{}_{}_desc-angio_N4bfc_brain_mask.nii.gz".format(sub, ses))  # type: str # save path of angio brain after Brain Extraction Tool (BET)
-        assert os.path.exists(bet_angio_bfc_path), "path {0} does not exist".format(bet_angio_bfc_path)  # make sure that path exists
+        assert os.path.exists(bet_angio_bfc_path), "path {} does not exist".format(bet_angio_bfc_path)  # make sure that path exists
 
         # since we are running patients in parallel, we must create separate tmp folders, otherwise we risk to overwrite/overload files of other subjects
         tmp_folder = os.path.join(out_dir, "tmp_{}_{}_{}_pos_patches".format(sub, ses, lesion_name))
@@ -1681,7 +1612,7 @@ def extract_distance_one_aneurysm(subdir, aneur_path, bids_path, overlapping, pa
         df_landmarks_tof_physical_space = convert_mni_to_angio(df_landmarks, bet_angio_bfc_sitk, tmp_folder, mni_2_struct_mat_path,
                                                                struct_2_tof_mat_path, mni_2_struct_inverse_warp_path)  # type: pd.DataFrame
 
-        lesion = (extract_lesion_info(os.path.join(subdir, aneur_path)))  # invoke external method and save dict with lesion information
+        lesion = (extract_lesion_info_inference(os.path.join(subdir, aneur_path)))  # invoke external method and save dict with lesion information
         sc_shift = lesion["widest_dimension"] // 2  # define Sanity Check shift (half side of widest lesion dimension)
         # N.B. I INVERT X and Y BECAUSE of OpenCV (see https://stackoverflow.com/a/56849032/9492673)
         x_center = lesion["centroid_y_coord"]  # extract x coordinate of lesion centroid
@@ -1820,13 +1751,13 @@ def extract_dark_fp_threshold_one_aneurysm(subdir, aneur_path, bids_dir):
     ses = re.findall(r"ses-\w{6}\d+", subdir)[0]  # extract ses
     # print("{}_{}".format(sub, ses))
     bfc_derivatives_dir = os.path.join(bids_dir, "derivatives", "N4_bias_field_corrected")
-    assert os.path.exists(bfc_derivatives_dir), "path {0} does not exist".format(bfc_derivatives_dir)  # make sure that path exists
+    assert os.path.exists(bfc_derivatives_dir), "path {} does not exist".format(bfc_derivatives_dir)  # make sure that path exists
 
     if "ADAM" in bfc_derivatives_dir:
         bet_angio_bfc_path = os.path.join(bfc_derivatives_dir, sub, ses, "anat", "{}_{}_desc-angio_N4bfc_brain_mask_ADAM.nii.gz".format(sub, ses))  # type: str # save path of angio brain after Brain Extraction Tool (BET)
     else:
         bet_angio_bfc_path = os.path.join(bfc_derivatives_dir, sub, ses, "anat", "{}_{}_desc-angio_N4bfc_brain_mask.nii.gz".format(sub, ses))  # type: str # save path of angio brain after Brain Extraction Tool (BET)
-    assert os.path.exists(bet_angio_bfc_path), "path {0} does not exist".format(bet_angio_bfc_path)  # make sure that path exists
+    assert os.path.exists(bet_angio_bfc_path), "path {} does not exist".format(bet_angio_bfc_path)  # make sure that path exists
 
     bet_angio_bfc_obj = nib.load(bet_angio_bfc_path)  # type: nib.Nifti1Image
     bet_angio_bfc_volume = np.asanyarray(bet_angio_bfc_obj.dataobj)  # type: np.ndarray
