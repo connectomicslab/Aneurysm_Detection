@@ -89,7 +89,7 @@ def extract_registration_quality_metrics(bids_ds_path, sub_ses_test):
     for sub in os.listdir(os.path.join(reg_metrics_dir)):
         for ses in os.listdir(os.path.join(reg_metrics_dir, sub)):
             sub_ses = "{}_{}".format(sub, ses)
-            if sub_ses not in sub_ses_test:  # only use training ones
+            if sub_ses not in sub_ses_test:  # only use training ones otherwise we might introduce a bias towards the registration quality metrics of the test set
                 for files in os.listdir(os.path.join(reg_metrics_dir, sub, ses)):
                     if "mni2struct" in files:
                         pass
@@ -311,7 +311,7 @@ def retrieve_intensity_conditions_one_sub(subdir, aneurysm_mask_path, data_path,
         if os.path.exists(tmp_folder) and os.path.isdir(tmp_folder):
             shutil.rmtree(tmp_folder)
 
-        if cnt_positive_patches > 0:
+        if cnt_positive_patches > 0:  # usually, there are multiple positive patches per aneurysm because of the sliding-window
             out_list = [np.median(ratios_local_vessel_mni), np.median(ratios_global_vessel_mni), np.median(ratios_local_tof_bet_bfc), np.median(ratios_global_tof_bet_bfc), np.median(non_zeros_vessel_mni)]
             return out_list
         else:
@@ -333,7 +333,8 @@ def extract_thresholds_of_intensity_criteria(data_path, sub_ses_test, patch_side
         overlapping (float): amount of overlapping between patches in sliding-window approach
         prints (bool): whether to print numerical thresholds that were found; defaults to True
     Returns:
-        intensity_thresholds (tuple): it contains the values to use for the extraction of the vessel-like negative samples
+        intensity_thresholds (tuple): it contains the values to use for the extraction of the vessel-like negative patches
+                                      (i.e. negative patches that have an overall intensity that resembles the one of positive patches)
     """
     regexp_sub = re.compile(r'sub')  # create a substring template to match
     ext_gz = '.gz'  # type: str # set zipped files extension
@@ -344,7 +345,7 @@ def extract_thresholds_of_intensity_criteria(data_path, sub_ses_test, patch_side
     for subdir, dirs, files in os.walk(data_path):
         for file in files:
             ext = os.path.splitext(file)[-1].lower()  # get the file extension
-            if regexp_sub.search(file) and ext == ext_gz and "Lesion" in file and "registrations" not in subdir:
+            if regexp_sub.search(file) and ext == ext_gz and "Lesion" in file and "registrations" not in subdir and "Treated" not in file:
                 sub = re.findall(r"sub-\d+", subdir)[0]
                 ses = re.findall(r"ses-\w{6}\d+", subdir)[0]  # extract ses
                 sub_ses = "{}_{}".format(sub, ses)
@@ -364,11 +365,11 @@ def extract_thresholds_of_intensity_criteria(data_path, sub_ses_test, patch_side
     out_list = [x for x in out_list if x]  # remove None values from list if present
     out_list_np = np.asarray(out_list)  # type: np.ndarray # convert from list to numpy array
 
-    q5_local_vessel_mni, q7_local_vessel_mni = np.percentile(out_list_np[:, 0], [5, 7])
-    q5_global_vessel_mni, q7_global_vessel_mni = np.percentile(out_list_np[:, 1], [5, 7])
-    q5_local_tof_bet, q7_local_tof_bet = np.percentile(out_list_np[:, 2], [5, 7])
-    q5_global_tof_bet, q7_global_tof_bet = np.percentile(out_list_np[:, 3], [5, 7])
-    q5_nz_vessel_mni = np.percentile(out_list_np[:, 4], [5])[0]
+    q5_local_vessel_mni, q7_local_vessel_mni = np.percentile(out_list_np[:, 0], [5, 7])  # extract local intensity thresholds of vessel mni volume
+    q5_global_vessel_mni, q7_global_vessel_mni = np.percentile(out_list_np[:, 1], [5, 7])  # extract global intensity thresholds of vessel mni volume
+    q5_local_tof_bet, q7_local_tof_bet = np.percentile(out_list_np[:, 2], [5, 7])  # extract local intensity thresholds of tof-bet-n4bfc volume
+    q5_global_tof_bet, q7_global_tof_bet = np.percentile(out_list_np[:, 3], [5, 7])  # extract global intensity thresholds of tof-bet-n4bfc volume
+    q5_nz_vessel_mni = np.percentile(out_list_np[:, 4], [5])[0]  # extract threshold related to number of non-zero voxels in vessel-mni patch
 
     if prints:
         print("\nIntensity thresholds with patch_side={}".format(patch_side))
@@ -628,10 +629,10 @@ def distance_is_plausible(patch_center_coordinates_physical_space, df_landmarks_
         eucl_distance = np.linalg.norm(patch_center_coordinates_physical_space - landmark_point_physical_space_tof)  # type: float # compute euclidean distance in TOF physical space
         distances.append(eucl_distance)
 
-    min_dist = np.min(distances)
-    mean_dist = np.mean(distances)
+    min_dist = np.min(distances)  # extract min distance
+    mean_dist = np.mean(distances)  # extract mean distance
 
-    # return True if (min_dist < XX and mean_dist < YY) else False, where XX and YY are computed empirically
+    # return True if (min_dist < XX and mean_dist < YY) else False, where XX and YY are thresholds computed empirically from the training dataset
     return True if (min_dist < distances_thresholds[0] and mean_dist < distances_thresholds[1]) else False
 
 
@@ -1674,7 +1675,7 @@ def extract_distance_one_aneurysm(subdir, aneur_path, bids_path, overlapping, pa
             min_and_mean_distances = None
             return min_and_mean_distances
     else:  # if instead we are dealing with a treated aneurysm
-        return None # in any case the Nones will be removed later
+        return None  # in any case the Nones will be removed later
 
 
 def extract_distance_thresholds(bids_ds_path, reg_quality_metrics_threshold, sub_ses_test, n_parallel_jobs, overlapping, patch_side, landmarks_physical_space_path, out_dir):
@@ -1703,7 +1704,7 @@ def extract_distance_thresholds(bids_ds_path, reg_quality_metrics_threshold, sub
         for file in files:
             ext = os.path.splitext(file)[-1].lower()  # get the file extension
             # save path of every positive patch
-            if "Lesion" in file and ext == ext_gz and "registrations" not in subdir:  # if we're dealing with the aneurysm volume
+            if "Lesion" in file and ext == ext_gz and "registrations" not in subdir and "Treated" not in file:  # if we're dealing with the aneurysm volume
                 sub = re.findall(r"sub-\d+", subdir)[0]
                 ses = re.findall(r"ses-\w{6}\d+", subdir)[0]  # extract ses
                 sub_ses = "{}_{}".format(sub, ses)
@@ -1727,13 +1728,13 @@ def extract_distance_thresholds(bids_ds_path, reg_quality_metrics_threshold, sub
 
     out_list_np = np.asanyarray(out_list)
     assert out_list_np.shape == (len(out_list), 2), "Shape mismatch"
-    min_distances = out_list_np[:, 0]
-    mean_distances = out_list_np[:, 1]
+    min_distances = out_list_np[:, 0]  # extract all min distances
+    mean_distances = out_list_np[:, 1]  # extract all mean distances
 
-    p97_min_distances = np.percentile(min_distances, [97])[0]
-    p97_mean_distances = np.percentile(mean_distances, [97])[0]
+    p97_min_distances = np.percentile(min_distances, [97])[0]  # extract a specific percentile
+    p97_mean_distances = np.percentile(mean_distances, [97])[0]  # extract a specific percentile
 
-    distances_thresholds = (p97_min_distances, p97_mean_distances)
+    distances_thresholds = (p97_min_distances, p97_mean_distances)  # type: tuple # combine thresholds into output tuple
 
     return distances_thresholds
 
@@ -1802,11 +1803,11 @@ def extract_dark_fp_threshold(bids_dir, sub_ses_test, nb_parallel_jobs):
         for file in files:
             ext = os.path.splitext(file)[-1].lower()  # get the file extension
             # if file name matches the specified template and extension is correct and we're dealing with a BET volume (original volume after skull-stripping)
-            if regexp_sub.search(file) and ext == ext_gz and "Lesion" in file and "N4" not in subdir and "registrations" not in subdir:
+            if regexp_sub.search(file) and ext == ext_gz and "Lesion" in file and "N4" not in subdir and "registrations" not in subdir and "Treated" not in file:
                 sub = re.findall(r"sub-\d+", subdir)[0]
                 ses = re.findall(r"ses-\w{6}\d+", subdir)[0]  # extract ses
                 sub_ses = "{}_{}".format(sub, ses)
-                if sub_ses not in sub_ses_test:  # only use training sub_ses otherwise we might introduce a bias towards the locations of the aneurysms in the test set
+                if sub_ses not in sub_ses_test:  # only use training sub_ses otherwise we might introduce a bias towards the intensities of the aneurysms in the test set
                     all_subdirs.append(subdir)
                     all_files.append(file)
 
@@ -1819,7 +1820,17 @@ def extract_dark_fp_threshold(bids_dir, sub_ses_test, nb_parallel_jobs):
     return dark_fp_threshold
 
 
-def extract_thresholds_for_anatomically_informed(bids_dir, sub_ses_test, unet_patch_side, new_spacing, inference_outputs_path, nb_parallel_jobs, overlapping, landmarks_physical_space_path, out_dir):
+def extract_thresholds_for_anatomically_informed(bids_dir,
+                                                 sub_ses_test,
+                                                 unet_patch_side,
+                                                 new_spacing,
+                                                 inference_outputs_path,
+                                                 nb_parallel_jobs,
+                                                 overlapping,
+                                                 landmarks_physical_space_path,
+                                                 out_dir,
+                                                 only_pretrain_on_adam,
+                                                 bids_dir_adam):
     """This function computes some thresholds that are needed for the anatomically-informed sliding-window approach. Specifically, it computes the registration quality metrics
     thresholds, some intensity thresholds and the distance thresholds.
     Args:
@@ -1832,12 +1843,17 @@ def extract_thresholds_for_anatomically_informed(bids_dir, sub_ses_test, unet_pa
         overlapping (float): amount of overlapping between patches in sliding-window approach
         landmarks_physical_space_path (str): path to file containing the landmark points in MNI physical space
         out_dir (str): path to folder where output files will be saved
+        only_pretrain_on_adam (bool): if True, we will do inference with a model that was only pretrained on ADAM and not finetuned on inhouse CHUV
+        bids_dir_adam (str): path to ADAM BIDS dataset
     Returns:
         reg_quality_metrics_threshold (tuple): thresholds to use to check whether the registration of a patient was correct or not
         intensity_thresholds (tuple): thresholds to use for extracting bright negative patches (that ideally contain vessels)
         distances_thresholds (tuple): thresholds to use for selecting patches which are "not-too-far" from the landmark points
         dark_fp_threshold (float): threshold used to remove predictions which are on average too dark for being a true aneurysm
     """
+    if only_pretrain_on_adam:  # if we do inference with a model that was only pre-trained on ADAM and not finetuned on inhouse CHUV
+        bids_dir = bids_dir_adam  # change input dataset
+
     # extract registration quality metrics; they will be used to decide whether the sliding-window is anatomically-informed or not
     print("\nComputing registration quality thresholds...")
     reg_quality_metrics_threshold = extract_registration_quality_metrics(bids_dir,
@@ -1876,7 +1892,7 @@ def extract_thresholds_for_anatomically_informed(bids_dir, sub_ses_test, unet_pa
     return reg_quality_metrics_threshold, intensity_thresholds, distances_thresholds, dark_fp_threshold
 
 
-def load_file_from_disk(file_path):
+def load_file_from_disk(file_path: str):
     """This function loads a file from disk and returns it
     Args:
         file_path (str): path to file
