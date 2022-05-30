@@ -6,6 +6,7 @@ In this file, the input parameters of `config_creation_ds_patches.json` are expl
 - `overlapping (float)`: amount of overlapping between patches in sliding-window approach
 - `mni_landmark_points_path (str)`: path to the csv file containing the landmark points coordinates. This can be found [here](https://github.com/connectomicslab/Aneurysm_Detection/blob/main/extra_files/Landmarks_LPS_mm_Dec_05_2020.csv)
 - `out_dataset_path (str)`: path to folder where we want to create the training dataset
+- `id_out_dataset (str)`: unique identified for output folder where dataset will be created
 - `subs_chuv_with_weak_labels_path (str)`: path to list containing patients with weak labels
 - `subs_chuv_with_voxelwise_labels_path (str)`: path to list containing patients with voxelwise labels
 - `jobs_in_parallel (int)`: number of CPUs to run subjects in parallel (the higher, the faster!); if set to `-1`, all available CPUs are used
