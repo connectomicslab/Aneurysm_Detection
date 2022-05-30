@@ -377,6 +377,7 @@ def extract_positive_patches(subdir,
 def create_patch_ds(bids_dataset_path,
                     mni_landmark_points_path,
                     out_dataset_path,
+                    id_out_dataset,
                     desired_spacing,
                     vessel_like_neg_patches,
                     random_neg_patches,
@@ -395,6 +396,7 @@ def create_patch_ds(bids_dataset_path,
         bids_dataset_path (str): path to BIDS dataset
         mni_landmark_points_path (str): path to the csv file containing the landmark points coordinates
         out_dataset_path (str): path to folder where we create the output dataset
+        id_out_dataset (str): unique identified for output folder where dataset will be created
         desired_spacing (list): list containing the desired voxel spacing for resampling the input volumes
         vessel_like_neg_patches (int): number of vessel-like negative patches to extract for each subject
         random_neg_patches (int): number of random negative patches to extract for each subject
@@ -418,7 +420,7 @@ def create_patch_ds(bids_dataset_path,
     assert os.path.exists(subs_chuv_with_voxelwise_labels_path), "Path {} does not exist".format(subs_chuv_with_voxelwise_labels_path)
 
     date = (datetime.today().strftime('%b_%d_%Y'))  # save today's date
-    dataset_name = "Data_Set_" + date  # create dataset's name
+    dataset_name = "Data_Set_{}_".format(id_out_dataset) + date  # create dataset's name
     out_dataset_path = os.path.join(out_dataset_path, dataset_name)
     regexp_sub = re.compile(r'sub')  # create a substring template to match
     ext_gz = '.gz'  # type: str # set zipped files extension
@@ -551,6 +553,7 @@ def main():
     overlapping = config_dict['overlapping']  # type: float # amount of overlapping between patches in sliding-window approach
     mni_landmark_points_path = config_dict['mni_landmark_points_path']  # type: str # path to file containining landmark points coordinates in physical space
     out_dataset_path = config_dict['out_dataset_path']  # type: str # path to output dataset
+    id_out_dataset = config_dict['id_out_dataset']  # type: str # unique identifier used for naming the output folder where the dataset will be created
     subs_chuv_with_weak_labels_path = config_dict['subs_chuv_with_weak_labels_path']  # type: str # path to pickle file containin the subjects with weak labels
     subs_chuv_with_voxelwise_labels_path = config_dict['subs_chuv_with_voxelwise_labels_path']  # type: str  # path to pickle file containin the subjects with weak labels
     jobs_in_parallel = config_dict['jobs_in_parallel']  # type: int # nb. jobs to run in parallel (i.e. number of CPU (cores) to use); if set to -1, all available CPUs are used
@@ -568,6 +571,7 @@ def main():
     create_patch_ds(bids_dataset_path,
                     mni_landmark_points_path,
                     out_dataset_path,
+                    id_out_dataset,
                     desired_spacing,
                     vessel_like_neg_patches,
                     random_neg_patches,
