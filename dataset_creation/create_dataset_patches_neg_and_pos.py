@@ -420,7 +420,7 @@ def create_patch_ds(bids_dataset_path,
     assert os.path.exists(subs_chuv_with_voxelwise_labels_path), "Path {} does not exist".format(subs_chuv_with_voxelwise_labels_path)
 
     date = (datetime.today().strftime('%b_%d_%Y'))  # save today's date
-    dataset_name = "Data_Set_{}_".format(id_out_dataset) + date  # create dataset's name
+    dataset_name = "Data_Set_{}_{}".format(date, id_out_dataset)  # create dataset's name
     out_dataset_path = os.path.join(out_dataset_path, dataset_name)
     regexp_sub = re.compile(r'sub')  # create a substring template to match
     ext_gz = '.gz'  # type: str # set zipped files extension
