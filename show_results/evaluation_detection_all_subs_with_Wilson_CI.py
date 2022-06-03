@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from statsmodels.stats.proportion import proportion_confint
 from show_results.utils_show_results import get_result_filename, detection_one_sub_for_conf_int
+from inference.utils_inference import load_config_file
 
 
 def detection_all_sub_with_conf_int(prediction_dir, ground_truth_dir):
@@ -55,8 +56,13 @@ def detection_all_sub_with_conf_int(prediction_dir, ground_truth_dir):
 
 
 def main():
-    prediction_dir = "/media/newuser/HagmannHDD/Aneurysm_Project_Tommaso/Dataset_Patches/minor_review_neuroinformatics_May_2022/Inference/chuv_no_pretrain_on_adam_anatinf_slid_wind_May_29_2022/"
-    ground_truth_dir = "/home/newuser/Desktop/MICCAI_Aneurysms/Ground_Truth_Dirs/Ground_Truth_Refined_Patient_Wise_CHUV_Aug_04_2021"
+    # the code inside here is run only when THIS script is run, and not just imported
+    config_dict = load_config_file()  # load input config file
+
+    # extract paths needed to run this script
+    prediction_dir = config_dict['prediction_dir']  # path to dir containing segmentation predictions
+    ground_truth_dir = config_dict['ground_truth_dir']  # path to dir containing the ground truth masks
+
     detection_all_sub_with_conf_int(prediction_dir, ground_truth_dir)
 
 
