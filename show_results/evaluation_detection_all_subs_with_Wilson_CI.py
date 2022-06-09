@@ -1,9 +1,17 @@
 import os
+import sys
+sys.path.append('/home/to5743/aneurysm_project/Aneurysm_Detection/')  # this line is needed on the HPC cluster to recognize the dir as a python package
 import numpy as np
 import pandas as pd
 from statsmodels.stats.proportion import proportion_confint
-from show_results.utils_show_results import get_result_filename, detection_one_sub_for_conf_int
+from show_results.utils_show_results import get_result_filename, detection_one_sub_for_conf_int, extract_unique_elements
 from inference.utils_inference import load_config_file
+
+
+__author__ = "Tommaso Di Noto"
+__version__ = "0.0.1"
+__email__ = "tommydino@hotmail.it"
+__status__ = "Prototype"
 
 
 def detection_all_sub_with_conf_int(prediction_dir, ground_truth_dir):
@@ -14,8 +22,10 @@ def detection_all_sub_with_conf_int(prediction_dir, ground_truth_dir):
     tp_list = []
     cnt_list = []
     fp_list = []
+    all_subs = []
     for fold in only_dirs:  # loop over test folds
         for sub in sorted(os.listdir(os.path.join(prediction_dir, fold))):  # loop over subjects
+            all_subs.append(sub)
             for ses in sorted(os.listdir(os.path.join(prediction_dir, fold, sub))):  # loop over sessions
                 subj_ses_count += 1  # increment counter
                 print("\n{}) Subject {}_{}".format(subj_ses_count, sub, ses))
@@ -34,6 +44,9 @@ def detection_all_sub_with_conf_int(prediction_dir, ground_truth_dir):
                     sens_list.append(froc_params[1])  # discard first element (not usable for the curve), extract sensitivity and append to external list
                     tp_list.append(froc_params[2])  # extract true positives and append to external list
                     cnt_list.append(froc_params[3])  # extract nb. aneurysms and append to external list
+
+    all_subs_unique = extract_unique_elements(all_subs)  # only retain unique elements
+    assert len(all_subs_unique) == 239, "There should be exactly 239 test subjects; found {} instead".format(len(all_subs_unique))
 
     sens_np = np.asarray(sens_list) * 100  # convert to %
     tps_df = pd.DataFrame(tp_list)
