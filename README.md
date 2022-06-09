@@ -41,7 +41,7 @@ Then, the script can be run with:
 network_training.py --config config_training.json
 ```
 ### 3) Inference
-The last step of the pipeline is the patient-wise inference performed on the test subjects with the sliding-window approach. The script used to carry out inference is `patient_wise_sliding_window.py` which is located inside the `inference` directory, together with the config file `config_inference.json`.
+The third step of the pipeline is the patient-wise inference performed on the test subjects with the sliding-window approach. The script used to carry out inference is `patient_wise_sliding_window.py` which is located inside the `inference` directory, together with the config file `config_inference.json`.
 
 If you ran the pipeline from the beginning (i.e. through steps 1) and 2)), then the `training_outputs_path` inside `config_inference.json` must correspond to the output folder that was created from [step 2)](#2-training). This output folder has been created in the same directory where the dataset of patches was created (`out_dataset_path` of [step 1)](#1-creation-of-training-dataset)) and should be named "Train_Outputs_%date_%input_ds_identifier".
 
@@ -51,4 +51,18 @@ Before running the script, you should also modify the paths in the config files 
 Then, the script can be run with:
 ```python
 patient_wise_sliding_window.py --config config_inference.json
+```
+### 4) Show/Plot results
+In this last step of the pipeline, we want to print/plot results that we obtained from inference. All the scripts for showing test results are inside the directory `show_results`, together with the corresponding config files. For instance,
+if we only want to print detection results, we can run:
+```python
+evaluation_detection_all_subs_with_CI.py --config config_evaluation_detection.json
+```
+If instead we want to compare two different models through a Wilcoxon signed-rank test as performed in the paper, we can run:
+```python
+wilcoxon_signed_rank_test_aufrocs_between_two_models.py --config config_wilcoxon_aufrocs.json
+```
+Finally, if we want to plot the FROC curves of several models, we can run:
+```python
+plot_multiple_FROC_curves_with_CI.py --config config_plot_FROC_curves.json
 ```
