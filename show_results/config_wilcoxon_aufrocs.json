@@ -1,0 +1,9 @@
+{
+	"prediction_dir_model1": "/output/dir/of/inference/model1/",
+    "prediction_dir_model2": "/output/dir/of/inference/model2/",
+ 	"ground_truth_dir": "/downloadable/from/https://drive.google.com/drive/folders/17TZiP-ieYlicDk6Fm0hh_qAel4azWQhd?usp=sharing",
+    "nb_parallel_jobs": -1,
+    "max_nb_fp_per_subject": 5,
+    "label_model1": "unique_id_for_model1",
+    "label_model2": "unique_id_for_model2"
+}
