@@ -21,7 +21,8 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from joblib import Parallel, delayed
 import random
-from inference.utils_inference import load_config_file, str2bool, round_half_up, load_file_from_disk
+from dataset_creation.utils_dataset_creation import print_running_time
+from inference.utils_inference import load_config_file, str2bool, round_half_up, load_file_from_disk, create_dir_if_not_exist
 
 
 __author__ = "Tommaso Di Noto"
@@ -46,41 +47,26 @@ def save_pickle_list_to_disk(list_to_save: list, out_dir: str, out_filename: str
     open_file.close()
 
 
-def find_pairs_and_labels(pos_patch_path: str, neg_patch_path: str):
-    """This function extracts all the sub_ses of the dataset and also saves the corresponding label in case we want to perform some
-    sort of stratification in the cross-validation between controls and patients.
+def find_sub_ses_pairs(data_path: str):
+    """This function extracts all the sub_ses of the dataset.
     Args:
-        pos_patch_path (str): path to folder containing all the positive patches. Inside, there will be only sub-ses belonging to patients (i.e. subs with aneurysm(s))
-        neg_patch_path (str): path to folder containing all the negative patches. Inside, there will be sub-ses belonging to the whole cohort cause both patients and controls have negative patches
+        data_path (str): path to folder containing all training patches (both negative and positive)
     Returns:
-        neg_sub_ses (list): it contains the sub-ses of the whole cohort
-        label_control_vs_patient (list): it has the same length as neg_sub_ses and has value 1 for sub-ses belonging to patients, while it has value 0 for sub-ses belonging to controls
+        all_sub_ses (list): it contains the sub-ses of the whole cohort
     """
-    pos_sub_ses = []
-    for dirs in os.listdir(pos_patch_path):
-        sub = re.findall(r"sub-\d+", dirs)[0]  # extract sub
-        ses = re.findall(r"ses-\w{6}\d+", dirs)[0]  # extract ses
-        sub_ses = "{}_{}".format(sub, ses)
-        pos_sub_ses.append(sub_ses)
+    neg_patch_path = os.path.join(data_path, "Negative_Patches")
 
-    neg_sub_ses = []
-    label_control_vs_patient = []  # type: list # will contain the labels used for the stratification of the cross-validation between controls and patients
-    for folders in os.listdir(neg_patch_path):
+    all_sub_ses = []
+    for folders in os.listdir(neg_patch_path):  # every subject (both controls and patients) has negative patches, so we just loop over the negative patches directory
         sub = re.findall(r"sub-\d+", folders)[0]  # extract sub
         ses = re.findall(r"ses-\w{6}\d+", folders)[0]  # extract ses
-        sub_ses = "{}_{}".format(sub, ses)
-        neg_sub_ses.append(sub_ses)
-        # if this sub_ses is also present in the positive patch folders, then we assign 1
-        if sub_ses in pos_sub_ses:
-            label_control_vs_patient.append(1)
-        # if instead the sub_ses is only present in the negative patch folders, we assign 0
-        else:
-            label_control_vs_patient.append(0)
+        sub_ses = "{}_{}".format(sub, ses)  # combine into unique string
+        all_sub_ses.append(sub_ses)
 
-    return neg_sub_ses, label_control_vs_patient
+    return all_sub_ses
 
 
-def define_output_folders(training_outputs_folder, ds_path_, cv_fold_numb_):
+def define_output_folders(training_outputs_folder: str, ds_path_: str, cv_fold_numb_: int):
     """This function takes as input the path where the dataset is stored and the path where the script is stored. Then, it creates the output folders and checks
     that the dataset folder is within the script path. This avoids that we use one script, but we save into another dataset's output folder.
     Args:
@@ -94,20 +80,16 @@ def define_output_folders(training_outputs_folder, ds_path_, cv_fold_numb_):
         test_subs_path_ (str): path where we'll store the test sub_ses for this split
     """
     model_path_ = os.path.join(ds_path_, training_outputs_folder, "fold{}".format(cv_fold_numb_), "saved_models", "my_checkpoint")
-    if not os.path.exists(os.path.dirname(model_path_)):  # if path does not exist
-        os.makedirs(os.path.dirname(model_path_))  # create it
+    create_dir_if_not_exist(model_path_)  # if path does not exist, create it
 
     plots_path_ = os.path.join(ds_path_, training_outputs_folder, "fold{}".format(cv_fold_numb_), "plots")
-    if not os.path.exists(plots_path_):  # if path does not exists
-        os.makedirs(plots_path_)  # create it
+    create_dir_if_not_exist(plots_path_)  # if path does not exists, create it
 
     tensorboard_cbk_path_ = os.path.join(ds_path_, training_outputs_folder, "fold{}".format(cv_fold_numb_), "logs_tensorboard")
-    if not os.path.exists(tensorboard_cbk_path_):  # if path does not exist
-        os.makedirs(tensorboard_cbk_path_)  # create it
+    create_dir_if_not_exist(tensorboard_cbk_path_)  # if path does not exist, create it
 
     test_subs_path_ = os.path.join(ds_path_, training_outputs_folder, "fold{}".format(cv_fold_numb_), "test_subs")
-    if not os.path.exists(test_subs_path_):  # if path does not exist
-        os.makedirs(test_subs_path_)  # create it
+    create_dir_if_not_exist(test_subs_path_)  # if path does not exist, create it
 
     return model_path_, plots_path_, tensorboard_cbk_path_, test_subs_path_
 
@@ -137,7 +119,7 @@ def create_tf_dataset_from_patches_and_masks(all_angio_patches_list, all_angio_m
     return dataset_, patch_side_, buffer_size_
 
 
-def create_dataset_positives_one_sub(subdir, file):
+def create_dataset_positives_one_sub(subdir: str, file: str):
     """This function creates a positive patch and the corresponding mask
     Args:
         subdir (str): folder where positive patch is stored
@@ -164,7 +146,7 @@ def create_dataset_positives_one_sub(subdir, file):
     return out_array
 
 
-def create_dataset_positives_parallel(pos_patches_path, subs_to_use, n_parallel_jobs):
+def create_dataset_positives_parallel(pos_patches_path: str, subs_to_use: list, n_parallel_jobs: int):
     """This function creates the dataset of all positive patches (and corresponding masks) in parallel
     Args:
         pos_patches_path (str): path to folder containing positive patches
@@ -280,18 +262,23 @@ def create_dataset_negatives_parallel(neg_patches_path, subs_to_use, n_parallel_
     return dataset, patch_side, buffer_size
 
 
-def create_batched_augmented_tf_dataset(pos_patches_path, subs_to_use, neg_patches_path, batch_size, n_parallel_jobs, augment=False):
-    """This function creates a tf.data.Dataset from the folder containing the negative and positive patches.
+def create_batched_augmented_tf_dataset(pos_patches_path: str,
+                                        subs_to_use: list,
+                                        neg_patches_path: str,
+                                        batch_size: int,
+                                        n_parallel_jobs: int,
+                                        augment=False):
+    """This function creates a tf.data.Dataset from the folders containing the negative and positive patches.
     Args:
         pos_patches_path (str): path to folder where positive patches are stored
         subs_to_use (list): it contains the sub_ses of all subjects to use to create the dataset of patches
         neg_patches_path (str): path to folder where negative patches are stored
         batch_size (int): size of each training batch
-        n_parallel_jobs (int): number of jobs to run in parallel
+        n_parallel_jobs (int): number of jobs to run in parallel (the higher, the faster)
         augment (bool): it indicates whether the dataset should be augmented or not; only the training dataset should be augmented; False by default
     Returns:
         batched_dataset (tf.data.Dataset): batched, standardized and augmented (only positive patches) version of the dataset to create
-        pos_patch_side (int): patch of positive (and negative) patches
+        pos_patch_side (int): patch side of positive (and negative) patches
     """
     pos_dataset, pos_patch_side, pos_buffer_size = create_dataset_positives_parallel(pos_patches_path, subs_to_use, n_parallel_jobs)
     neg_dataset, neg_patch_side, neg_buffer_size = create_dataset_negatives_parallel(neg_patches_path, subs_to_use, n_parallel_jobs)
@@ -419,7 +406,7 @@ def create_standardized_batched_dataset_and_prefetch(ds, batch_size_):
     # standardize samples to have mean 0 and variance 1
     ds = ds.map(lambda x, y: (tf.image.per_image_standardization(x), y), num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
-    # divide datasets in batches
+    # divide dataset in batches
     batched_train_dataset_ = ds.batch(batch_size_)
 
     # ADD channel dimension to train dataset (both to the samples and to the labels) through the "map" method of tf.data.Dataset;
@@ -430,24 +417,6 @@ def create_standardized_batched_dataset_and_prefetch(ds, batch_size_):
     batched_train_dataset_ = batched_train_dataset_.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
     return batched_train_dataset_
-
-
-def print_running_time(start_time, end_time, process_name):
-    """This function takes as input the start and the end time of a process and prints to console the time elapsed for this process
-    Args:
-        start_time (float): instant when the timer is started
-        end_time (float): instant when the timer was stopped
-        process_name (string): name of the process
-    Returns:
-        None
-    """
-    sentence = str(process_name)  # convert to string whatever the user inputs as third argument
-    temp = end_time - start_time  # compute time difference
-    hours = temp // 3600  # compute hours
-    temp = temp - 3600 * hours  # if hours is not zero, remove equivalent amount of seconds
-    minutes = temp // 60  # compute minutes
-    seconds = temp - 60 * minutes  # compute minutes
-    print('\n%s time: %d hh %d mm %d ss' % (sentence, hours, minutes, seconds))
 
 
 def dice_coeff(y_true, y_pred, smooth=1.):
@@ -857,10 +826,7 @@ def cross_validation(data_path,
     assert fold_to_do in range(1, 6), "Fold can only be 1, 2, 3, 4, 5; found {} instead".format(fold_to_do)
     print("\nTensorflow version used: {}".format(tf.version.VERSION))  # print tensorflow version
     # ------------------------------------------------------------------------
-    neg_patch_path = os.path.join(data_path, "Negative_Patches")
-    pos_patch_path = os.path.join(data_path, "Positive_Patches")
-
-    all_sub_ses, _ = find_pairs_and_labels(pos_patch_path, neg_patch_path)
+    all_sub_ses = find_sub_ses_pairs(data_path)  # extract all sub_ses pairs
 
     # retrieve train and test subs from previous experiment that we want to emulate
     test_subs_previous_split = load_file_from_disk(os.path.join(train_test_split_to_replicate, "fold{}".format(fold_to_do), "test_subs", "test_sub_ses.pkl"))
