@@ -22,7 +22,7 @@ from dataset_creation.utils_dataset_creation import load_resampled_vol_and_bound
     nb_last_created_patch, extract_vessel_like_neg_patches, extract_random_neg_patches, extract_neg_landmark_patches, load_nifti_and_resample, \
     randomly_translate_coordinates, extract_thresholds_of_intensity_criteria, refine_weak_label_one_sub, load_pickle_list_from_disk, \
     weakify_voxelwise_label_one_sub
-from inference.utils_inference import load_config_file, str2bool
+from inference.utils_inference import load_config_file, str2bool, create_dir_if_not_exist
 
 
 __author__ = "Tommaso Di Noto"
@@ -87,8 +87,7 @@ def extract_negative_patches(subdir,
 
     # create tmp folder where we save temporary files (this folder will be deleted at the end)
     tmp_folder = os.path.join(out_dataset_path, "tmp_{}_{}_neg_patches".format(sub, ses))
-    if not os.path.exists(tmp_folder):
-        os.makedirs(tmp_folder)
+    create_dir_if_not_exist(tmp_folder)
 
     # save path of original angio path before BET
     if "ADAM" in subdir:
