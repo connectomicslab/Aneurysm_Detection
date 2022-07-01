@@ -27,7 +27,7 @@ import cv2
 import pickle
 import argparse
 import json
-from dataset_creation.utils_dataset_creation import extract_lesion_info_modified
+from dataset_creation.utils_dataset_creation import extract_lesion_info_modified, print_running_time
 
 
 __author__ = "Tommaso Di Noto"
@@ -2253,21 +2253,13 @@ def predict_augmented_patches(patch, augm_patch_hor_flip, augm_patch_ver_flip, a
            pred_augm_patch_90_rot, pred_augm_patch_adj_contr, pred_augm_patch_gamma_corr, pred_augm_patch_gauss_noise
 
 
-def namestr(obj, namespace):
-    """This function extracts the name of the variable in a list
-    Args:
-        obj: variable whose name we want to extract
-        namespace: namespace of interest
-    """
-    return [name for name in namespace if namespace[name] is obj]
-
-
 def compute_test_time_augmentation(batched_dataset, unet, unet_batch_size, aff_mat_resampled):
     """This function performs test time data augmentation on the retained patches of the sliding-window approach
     Args:
         batched_dataset (tf.data.Dataset): input dataset to augment
         unet (tf.keras.Model): trained network with which we perform inference
         unet_batch_size (int): batch size. Not really relevant (cause we're doing inference), but still needed
+        aff_mat_resampled (np.ndarray): affine matrix of the resampled volume
     Returns:
         tta_pred_patches (np.ndarray): average predictions (across augmentations) for all the retained patches of the sliding-window
     """
@@ -2328,24 +2320,6 @@ def compute_test_time_augmentation(batched_dataset, unet, unet_batch_size, aff_m
     tta_pred_patches = np.asarray(mean_predictions_all_retained_patches)  # type: np.ndarray
 
     return tta_pred_patches
-
-
-def print_running_time(start_time, end_time, process_name):
-    """This function takes as input the start and the end time of a process and prints to console the time elapsed for this process
-    Args:
-        start_time (float): instant when the timer is started
-        end_time (float): instant when the timer was stopped
-        process_name (string): name of the process
-    Returns:
-        None
-    """
-    sentence = str(process_name)  # convert to string whatever the user inputs as third argument
-    temp = end_time - start_time  # compute time difference
-    hours = temp // 3600  # compute hours
-    temp = temp - 3600 * hours  # if hours is not zero, remove equivalent amount of seconds
-    minutes = temp // 60  # compute minutes
-    seconds = temp - 60 * minutes  # compute minutes
-    print('\n%s time: %d hh %d mm %d ss' % (sentence, hours, minutes, seconds))
 
 
 def load_config_file():
