@@ -23,23 +23,13 @@ from joblib import Parallel, delayed
 import shutil
 import pickle
 from typing import List
+from show_results.utils_show_results import round_half_up
 
 
 __author__ = "Tommaso Di Noto"
 __version__ = "0.0.1"
 __email__ = "tommydino@hotmail.it"
 __status__ = "Prototype"
-
-
-def round_half_up(n, decimals=0):
-    """This function rounds to the nearest integer number (e.g 2.4 becomes 2.0 and 2.6 becomes 3);
-     in case of tie, it rounds up (e.g. 1.5 becomes 2.0 and not 1.0)
-    Args:
-        n (float): number to round
-        decimals (int): number of decimal figures that we want to keep; defaults to zero
-    """
-    multiplier = 10 ** decimals
-    return math.floor(n*multiplier + 0.5) / multiplier
 
 
 def print_running_time(start_time: float,
@@ -56,7 +46,7 @@ def print_running_time(start_time: float,
     hours = temp // 3600  # compute hours
     temp = temp - 3600 * hours  # if hours is not zero, remove equivalent amount of seconds
     minutes = temp // 60  # compute minutes
-    seconds = temp - 60 * minutes  # compute minutes
+    seconds = temp - 60 * minutes  # compute seconds
     print('\n%s time: %d hh %d mm %d ss' % (sentence, hours, minutes, seconds))
 
 
