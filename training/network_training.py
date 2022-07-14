@@ -21,6 +21,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from joblib import Parallel, delayed
 import random
+from typing import Tuple
 from dataset_creation.utils_dataset_creation import print_running_time
 from inference.utils_inference import load_config_file, str2bool, round_half_up, load_file_from_disk, create_dir_if_not_exist
 
@@ -66,7 +67,9 @@ def find_sub_ses_pairs(data_path: str):
     return all_sub_ses
 
 
-def define_output_folders(training_outputs_folder: str, ds_path_: str, cv_fold_numb_: int):
+def define_output_folders(training_outputs_folder: str,
+                          ds_path_: str,
+                          cv_fold_numb_: int) -> Tuple[str, str, str, str]:
     """This function takes as input the path where the dataset is stored and the path where the script is stored. Then, it creates the output folders and checks
     that the dataset folder is within the script path. This avoids that we use one script, but we save into another dataset's output folder.
     Args:
