@@ -678,8 +678,6 @@ def patch_wise_training(data_path,
     # -----------------------------------------------------------------------------------------------------------------------
     pos_patches_path = os.path.join(data_path, "Positive_Patches")  # type: str
     assert os.path.exists(pos_patches_path), "Path {} does not exist".format(pos_patches_path)
-    pos_masks_path = os.path.join(data_path, "Positive_Patches_Masks")  # type: str
-    assert os.path.exists(pos_masks_path), "Path {} does not exist".format(pos_masks_path)
     neg_patches_path = os.path.join(data_path, "Negative_Patches")  # type: str
     assert os.path.exists(neg_patches_path), "Path {} does not exist".format(neg_patches_path)
 
