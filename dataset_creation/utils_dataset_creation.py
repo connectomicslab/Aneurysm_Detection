@@ -42,14 +42,14 @@ def round_half_up(n, decimals=0):
     return math.floor(n*multiplier + 0.5) / multiplier
 
 
-def print_running_time(start_time, end_time, process_name):
+def print_running_time(start_time: float,
+                       end_time: float,
+                       process_name: str) -> None:
     """This function takes as input the start and the end time of a process and prints to console the time elapsed for this process
     Args:
         start_time (float): instant when the timer is started
         end_time (float): instant when the timer was stopped
-        process_name (string): name of the process
-    Returns:
-        None
+        process_name (str): name of the process
     """
     sentence = str(process_name)  # convert to string whatever the user inputs as third argument
     temp = end_time - start_time  # compute time difference
@@ -58,7 +58,6 @@ def print_running_time(start_time, end_time, process_name):
     minutes = temp // 60  # compute minutes
     seconds = temp - 60 * minutes  # compute minutes
     print('\n%s time: %d hh %d mm %d ss' % (sentence, hours, minutes, seconds))
-    return
 
 
 def resample_volume(volume_path, new_spacing, out_path, interpolator=sitk.sitkLinear):
@@ -89,7 +88,7 @@ def resample_volume(volume_path, new_spacing, out_path, interpolator=sitk.sitkLi
 
 
 def load_resampled_vol_and_boundaries(volume_path, new_spacing_, tmp_folder_, sub_, ses_):
-    """ This function loads a 3D nifti volume, converts it to numpy, resamples it to "new_spacing_" and computes the boundaries
+    """This function loads a 3D nifti volume, converts it to numpy, resamples it to "new_spacing_" and computes the boundaries
     of non-empty rows, columns and slices. It returns these boundaries, the numpy volume and the affine transformation of the nifti object.
     Args:
         volume_path (str): path where nii.gz file is stored
@@ -958,8 +957,6 @@ def refine_weak_label_one_sub(pos_path_path, masks_path):
     Args:
         pos_path_path (str): path to the positive patch to be refined
         masks_path (str): path to the folder containing all the positive masks
-    Returns:
-        None
     Raises:
         ValueError: if any of the masks is either non-binary or empty
         ValueError: if the newly created refined mask is either non-binary or empty
@@ -1101,12 +1098,10 @@ def extract_lesion_info(lesion_volume, prints=False):
 
 
 def weakify_voxelwise_label_one_sub(pos_path_path, masks_path):
-    """ This function converts the voxelwise mask of a positive patch into a weak mask: it creates a sphere around the aneurysm center
+    """This function converts the voxelwise mask of a positive patch into a weak mask: it creates a sphere around the aneurysm center
     Args:
         pos_path_path (str): path to the positive patch to be converted
         masks_path (str): path to the folder containing all the positive masks
-    Returns:
-        None
     Raises:
         ValueError: if the voxelwise mask is either non-binary or empty
         ValueError: if the newly created weak mask is either non-binary or empty
