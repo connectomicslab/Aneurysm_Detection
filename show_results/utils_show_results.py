@@ -7,11 +7,11 @@ import warnings
 from joblib import Parallel, delayed
 import re
 import cc3d
+import math
 from scipy import ndimage
 from sklearn.metrics import auc
 from statsmodels.stats.proportion import proportion_confint
 from scipy.ndimage.measurements import center_of_mass
-from inference.utils_inference import round_half_up
 
 
 __author__ = "Tommaso Di Noto"
@@ -675,3 +675,14 @@ def compute_sensitivities_froc_curve_with_conf_int(prediction_dir_model, ground_
     mean_sensitivities, lower_bounds, upper_bounds = extract_mean_sensitivities_modified(out_metrics_list, max_nb_fp_per_subject)
 
     return mean_sensitivities, lower_bounds, upper_bounds
+
+
+def round_half_up(n: float, decimals: int = 0):
+    """This function rounds to the nearest integer number (e.g 2.4 becomes 2.0 and 2.6 becomes 3);
+     in case of tie, it rounds up (e.g. 1.5 becomes 2.0 and not 1.0)
+    Args:
+        n (float): number to round
+        decimals (int): number of decimal figures that we want to keep; defaults to zero
+    """
+    multiplier = 10 ** decimals
+    return math.floor(n*multiplier + 0.5) / multiplier
