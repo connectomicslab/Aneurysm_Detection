@@ -5,7 +5,7 @@
 </p>
 
 
-This repository contains the code used for the [paper](https://arxiv.org/abs/2103.06168): "Towards automated brain aneurysm detection in TOF-MRA: open data, weak labels, and anatomical knowledge". 
+This repository contains the code used for the [paper](https://link.springer.com/article/10.1007/s12021-022-09597-0): "Towards automated brain aneurysm detection in TOF-MRA: open data, weak labels, and anatomical knowledge". 
 
 Please cite the paper if you are using either our dataset or model.
 
