@@ -485,7 +485,7 @@ def create_compiled_unet(inputs_, learning_rate, lambda_loss, conv_filters):
         inputs_ (tf.keras.Input): input to the model; used to set the input dimensions
         learning_rate (float): learning rate of the model
         lambda_loss (float): value that weights the two terms of the hybrid loss
-        conv_filters (list): it contains the number of filters to use in the convolution layers
+        conv_filters (tuple): it contains the number of filters to use in the convolution layers
     Returns:
         model (tf.keras.Model): the compiled U-Net
     """
