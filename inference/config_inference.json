@@ -19,7 +19,13 @@
  	"remove_dark_fp": "False",
     
  	"bids_dir": "/path/to/BIDS/dataset/downloadable/from/OpenNEURO/",
+	"all_test_sub_ses_inhouse": "/Aneurysm_Detection/extra_files/all_test_subs_inhouse.pkl",
  	"training_outputs_path": "/path/to/dir/containing/Training_Outputs",
+
+	"only_pretrain_on_adam": "False",
+	"bids_dir_adam": "/path/to/ADAM/dataset/BIDS_format/available_upon_request/",
+	"training_outputs_path_adam": "/Aneurysm_Detection/extra_files/Train_Outputs_whole_adam_ds",
+
 	"ground_truth_dir": "/downloadable/from/https://drive.google.com/drive/folders/17TZiP-ieYlicDk6Fm0hh_qAel4azWQhd?usp=sharing",
 	"id_output_dir": "unique_id_for_this_run",
 	"landmarks_physical_space_path": "/Aneurysm_Detection/extra_files/Landmarks_LPS_mm_Dec_05_2020.csv",
