@@ -24,6 +24,7 @@ import shutil
 import pickle
 from typing import List
 from show_results.utils_show_results import round_half_up
+from inference.utils_inference import create_dir_if_not_exist
 
 
 __author__ = "Tommaso Di Noto"
@@ -399,8 +400,7 @@ def extract_neg_patches_from_anatomical_landmarks(lesion_coords, resampled_origi
         center_mm_coord_mni = [row["x"], row["y"], row["z"], 0]  # type: list # save center coordinate in list
 
         # WRITE original angio coordinate in physical space (mm) as csv file
-        if not os.path.exists(csv_folder):  # if path does not exist
-            os.makedirs(csv_folder)  # create it
+        create_dir_if_not_exist(csv_folder)  # if directory does not exist, create it
         csv_path = os.path.join(csv_folder, "Original_Point_mm_MNI.csv")  # add filename to path
 
         # create csv file
@@ -765,8 +765,7 @@ def retrieve_intensity_conditions_one_sub(subdir, aneurysm_mask_path, data_path,
 
     # create unique tmp folder where we save temporary files (this folder will be deleted at the end)
     tmp_folder = os.path.join(out_folder, "tmp_{}_{}_{}_pos_patches".format(sub, ses, lesion_name))
-    if not os.path.exists(tmp_folder):
-        os.makedirs(tmp_folder)
+    create_dir_if_not_exist(tmp_folder)  # if tmp directory does not exist, create it
 
     print("{}-{}-{}".format(sub, ses, lesion_name))
 
