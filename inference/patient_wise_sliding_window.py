@@ -33,10 +33,31 @@ __email__ = "tommydino@hotmail.it"
 __status__ = "Prototype"
 
 
-def inference_one_subject(subdir, file, bids_dir_path, sub_ses_test, unet_checkpoint_path, unet_patch_side, unet_batch_size, unet_threshold,
-                          max_fp, out_dir, landmarks_physical_space_path, new_spacing, reg_quality_metrics_threshold,
-                          intensity_thresholds, distances_thresholds, dark_fp_threshold, ground_truth_dir, min_aneurysm_volume, unet,
-                          anatomically_informed_sliding_window=True, test_time_augmentation=True, overlapping=0., reduce_fp=True, reduce_fp_with_volume=True, remove_dark_fp=True):
+def inference_one_subject(subdir,
+                          file,
+                          bids_dir_path,
+                          sub_ses_test,
+                          unet_checkpoint_path,
+                          unet_patch_side,
+                          unet_batch_size,
+                          unet_threshold,
+                          max_fp,
+                          out_dir,
+                          landmarks_physical_space_path,
+                          new_spacing,
+                          reg_quality_metrics_threshold,
+                          intensity_thresholds,
+                          distances_thresholds,
+                          dark_fp_threshold,
+                          ground_truth_dir,
+                          min_aneurysm_volume,
+                          unet,
+                          anatomically_informed_sliding_window=True,
+                          test_time_augmentation=True,
+                          overlapping=0.,
+                          reduce_fp=True,
+                          reduce_fp_with_volume=True,
+                          remove_dark_fp=True):
     """This function performs the sliding-window inference for one subject
     Args:
         subdir (str): folder where N4bfc_brain_mask is stored
@@ -223,7 +244,9 @@ def inference_one_subject(subdir, file, bids_dir_path, sub_ses_test, unet_checkp
                                  unet_batch_size)
 
             # ---------------------- SANITY CHECK ----------------------
-            check_output_consistency_between_detection_and_segmentation(os.path.join(out_dir, sub, ses), sub, ses)
+            check_output_consistency_between_detection_and_segmentation(os.path.join(out_dir, sub, ses),
+                                                                        sub,
+                                                                        ses)
             # --------------------------------------------------- SAVE SLIDING-WINDOW MASK --------------------------------------------------
             save_sliding_window_mask_to_disk(retained_patches,
                                              aff_resampled,
@@ -235,7 +258,10 @@ def inference_one_subject(subdir, file, bids_dir_path, sub_ses_test, unet_checkp
             if os.path.exists(tmp_path) and os.path.isdir(tmp_path):
                 shutil.rmtree(tmp_path)
             # ------------------------------------------ COMPUTE DETECTION and SEGMENTATION METRICS ------------------------------------------
-            out_metrics = compute_patient_wise_metrics(os.path.join(out_dir, sub, ses), os.path.join(ground_truth_dir, sub, ses), sub, ses)  # type: pd.DataFrame
+            out_metrics = compute_patient_wise_metrics(os.path.join(out_dir, sub, ses),
+                                                       os.path.join(ground_truth_dir, sub, ses),
+                                                       sub,
+                                                       ses)  # type: pd.DataFrame
             # uncomment line below for debugging
             # print("Output metrics for {}_{} = {}".format(sub, ses, out_metrics.values[0]))  # print detection and segmentation results for this subject
 
@@ -263,7 +289,7 @@ def main():
     unet_threshold = config_dict['unet_threshold']
     overlapping = config_dict['overlapping']
     new_spacing = config_dict['new_spacing']
-    conv_filters = config_dict['conv_filters']
+    conv_filters = tuple(config_dict['conv_filters'])
     lr = config_dict['lr']  # type: float # learning rate
     lambda_loss = config_dict['lambda_loss']  # type: float # value that weights the two terms of the hybrid loss
     cv_folds = config_dict['cv_folds']
