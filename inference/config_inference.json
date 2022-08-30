@@ -18,7 +18,7 @@
  	"min_aneurysm_volume": 0.70,
  	"remove_dark_fp": "False",
     
- 	"bids_dir": "/path/to/BIDS/dataset/downloadable/from/OpenNEURO/",
+ 	"bids_dir_inhouse": "/path/to/BIDS/dataset/downloadable/from/OpenNEURO/",
 	"all_test_sub_ses_inhouse": "/Aneurysm_Detection/extra_files/all_test_subs_inhouse.pkl",
  	"training_outputs_path": "/path/to/dir/containing/Training_Outputs",
 
