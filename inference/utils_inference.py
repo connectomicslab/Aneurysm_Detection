@@ -27,7 +27,9 @@ import cv2
 import pickle
 import argparse
 import json
+from typing import Tuple, Any
 from dataset_creation.utils_dataset_creation import extract_lesion_info_modified, print_running_time
+from show_results.utils_show_results import sort_dict_by_value, round_half_up
 
 
 __author__ = "Tommaso Di Noto"
@@ -39,21 +41,19 @@ __status__ = "Prototype"
 def create_dir_if_not_exist(dir_to_create: str) -> None:
     """This function creates the input dir if it doesn't exist.
     Args:
-        dir_to_create (str): directory that we want to create
-    Returns:
-        None
+        dir_to_create: directory that we want to create
     """
     if not os.path.exists(dir_to_create):  # if dir doesn't exist
         os.makedirs(dir_to_create)  # create it
 
 
-def create_input_lists(bids_dir: str):
+def create_input_lists(bids_dir: str) -> Tuple[list, list]:
     """This function creates the input lists that are used to run the patient-wise analysis in parallel
     Args:
-        bids_dir (str): path to BIDS dataset folder
+        bids_dir : path to BIDS dataset folder
     Returns:
-        all_subdirs (list): list of subdirs (i.e. path to parent dir of n4bfc angio volumes)
-        all_files (list): list of filenames of n4bfc angio volumes
+        all_subdirs: list of subdirs (i.e. path to parent dir of n4bfc angio volumes)
+        all_files: list of filenames of n4bfc angio volumes
     """
     regexp_sub = re.compile(r'sub')  # create a substring template to match
     ext_gz = '.gz'  # type: str # set zipped files extension
@@ -72,16 +72,17 @@ def create_input_lists(bids_dir: str):
     return all_subdirs, all_files
 
 
-def extract_registration_quality_metrics(bids_ds_path, sub_ses_test):
+def extract_registration_quality_metrics(bids_ds_path: str,
+                                         sub_ses_test: list) -> Tuple[float, float]:
     """This function checks the registration quality metrics for all patients and saves some thresholds. If during the patient-wise one subject has registration quality
      values which are outliers, the sliding-window approach for that subject will not be anatomically-informed. Instead, the whole brain will be scanned.
      In general, the problematic registration is the struct_2_tof one (and not the mni_2_struct), because the TOF volume sometimes is cut.
      Args:
-         bids_ds_path (str): path to BIDS dataset
-         sub_ses_test (list): sub_ses of the test set; we use it to take only the sub_ses of the training set
+         bids_ds_path: path to BIDS dataset
+         sub_ses_test: sub_ses of the test set; we use it to take only the sub_ses of the training set
      Returns:
-        p3_neigh_corr_struct_2_tof (float): the 3th percentile of the Neighborhood Correlation quality metric distribution (of the struct_2_tof registration)
-        p97_mut_inf_struct_2_tof (float): the 97th percentile of the Mattes Mutual Information quality metric distribution (of the struct_2_tof registration)
+        p3_neigh_corr_struct_2_tof: the 3th percentile of the Neighborhood Correlation quality metric distribution (of the struct_2_tof registration)
+        p97_mut_inf_struct_2_tof: the 97th percentile of the Mattes Mutual Information quality metric distribution (of the struct_2_tof registration)
      """
     reg_metrics_dir = os.path.join(bids_ds_path, "derivatives", "registrations", "reg_metrics")
     all_struct_2_tof_neigh_corr = []
@@ -106,7 +107,8 @@ def extract_registration_quality_metrics(bids_ds_path, sub_ses_test):
     return p3_neigh_corr_struct_2_tof, p97_mut_inf_struct_2_tof
 
 
-def extract_lesion_info_inference(path_to_lesion: str, prints=False):
+def extract_lesion_info_inference(path_to_lesion: str,
+                                  prints=False):
     """This function takes as input the path of a binary volumetric mask, loops through the slices which have some non-zero pixels and returns some information about the entire lesion: i.e.
     number of slices enclosing the lesion, index of slice with more white pixels, the equivalent diameter of the lesion width in that specific slice, and the coordinates of the
     centroid of the lesion. If "prints" is set to True, the method also prints this information."""
@@ -145,35 +147,41 @@ def extract_lesion_info_inference(path_to_lesion: str, prints=False):
         equiv_diameter = np.array(p.equivalent_diameter).astype(int)  # we save the diameter of a circle with the same area as our ROI (we save it as int for simplicity)
 
     m = cv2.moments(lesion_volume[:, :, idx])  # calculate moments of binary image
-    cX = int(m["m10"] / m["m00"])  # calculate x coordinate of center
-    cY = int(m["m01"] / m["m00"])  # calculate y coordinate of center
+    cx = int(m["m10"] / m["m00"])  # calculate x coordinate of center
+    cy = int(m["m01"] / m["m00"])  # calculate y coordinate of center
     if prints:  # if prints is set to True when invoking the method
-        print("The widest ROI has an equivalent diameter of {} pixels and is approximately centered at x,y = [{},{}]\n".format(equiv_diameter, cX, cY))
+        print("The widest ROI has an equivalent diameter of {} pixels and is approximately centered at x,y = [{},{}]\n".format(equiv_diameter, cx, cy))
 
     # create dict fields (keys) and fill them with values
     lesion_info["slices"] = slices_enclosing_aneurysms
     lesion_info["idx_slice_with_more_white_pixels"] = idx
     lesion_info["equivalent_diameter"] = equiv_diameter
-    lesion_info["centroid_x_coord"] = cX
-    lesion_info["centroid_y_coord"] = cY
+    lesion_info["centroid_x_coord"] = cx
+    lesion_info["centroid_y_coord"] = cy
     lesion_info["widest_dimension"] = slices_enclosing_aneurysms if slices_enclosing_aneurysms > equiv_diameter else equiv_diameter  # save biggest dimension between the two
     lesion_info["nb_non_zero_voxels"] = sum(tot_nb_white_pixels)  # sum all elements inside list
 
     return lesion_info  # returns the dictionary with the lesion information
 
 
-def retrieve_intensity_conditions_one_sub(subdir, aneurysm_mask_path, data_path, new_spacing, patch_side, out_folder, overlapping):
+def retrieve_intensity_conditions_one_sub(subdir: str,
+                                          aneurysm_mask_path: str,
+                                          data_path: str,
+                                          new_spacing: list,
+                                          patch_side: int,
+                                          out_folder: str,
+                                          overlapping: float) -> Any:
     """This function computes the intensity thresholds for extracting the vessel-like negative patches
     Args:
-        subdir (str): path to parent folder of aneurysm_mask_path
-        aneurysm_mask_path (str): path to aneurysm mask
-        data_path (str): path to BIDS dataset
-        new_spacing (list): desired voxel spacing to which we want to resample
-        patch_side (int): side of cubic patches that will be created
-        out_folder (str): path to output folder; during ds creation it is where we create the output dataset; at inference, it is where we save segmentation outputs
-        overlapping (float): amount of overlapping between patches in sliding-window approach
+        subdir: path to parent folder of aneurysm_mask_path
+        aneurysm_mask_path: path to aneurysm mask
+        data_path: path to BIDS dataset
+        new_spacing: desired voxel spacing to which we want to resample
+        patch_side: side of cubic patches that will be created
+        out_folder: path to output folder; during ds creation it is where we create the output dataset; at inference, it is where we save segmentation outputs
+        overlapping: amount of overlapping between patches in sliding-window approach
     Returns:
-        out_list (list): it contains values of interest from which we will draw the final thresholds; if no positive patch was evaluated, we return None
+        out_list: it contains values of interest from which we will draw the final thresholds; if no positive patch was evaluated, we return None
     Raises:
         AssertionError: if the BIDS dataset path does not exist
         AssertionError: if the folder containing the vesselMNI deformed volume does not exist
@@ -320,18 +328,25 @@ def retrieve_intensity_conditions_one_sub(subdir, aneurysm_mask_path, data_path,
         return None
 
 
-def extract_thresholds_of_intensity_criteria(data_path, sub_ses_test, patch_side, new_spacing, out_folder, n_parallel_jobs, overlapping, prints=True):
+def extract_thresholds_of_intensity_criteria(data_path: str,
+                                             sub_ses_test: list,
+                                             patch_side: int,
+                                             new_spacing: list,
+                                             out_folder: str,
+                                             n_parallel_jobs: int,
+                                             overlapping: float,
+                                             prints: bool = True) -> tuple:
     """This function computes the threshold to use for the extraction of the vessel-like negative patches (i.e. the
     negative patches that roughly have the same average intensity of the positive patches and include vessels)
     Args:
-        data_path (str): path to BIDS dataset
-        sub_ses_test (list): sub_ses of the test set; we use it to take only the sub_ses of the training set
-        patch_side (int): side of cubic patches
-        new_spacing (list): desired voxel spacing
-        out_folder (str): path to output folder; during ds creation it is where we create the output dataset; at inference, it is where we save segmentation outputs
-        n_parallel_jobs (int): number of jobs to run in parallel
-        overlapping (float): amount of overlapping between patches in sliding-window approach
-        prints (bool): whether to print numerical thresholds that were found; defaults to True
+        data_path: path to BIDS dataset
+        sub_ses_test: sub_ses of the test set; we use it to take only the sub_ses of the training set
+        patch_side: side of cubic patches
+        new_spacing: desired voxel spacing
+        out_folder: path to output folder; during ds creation it is where we create the output dataset; at inference, it is where we save segmentation outputs
+        n_parallel_jobs: number of jobs to run in parallel
+        overlapping: amount of overlapping between patches in sliding-window approach
+        prints: whether to print numerical thresholds that were found; defaults to True
     Returns:
         intensity_thresholds (tuple): it contains the values to use for the extraction of the vessel-like negative patches
                                       (i.e. negative patches that have an overall intensity that resembles the one of positive patches)
@@ -397,13 +412,13 @@ def extract_thresholds_of_intensity_criteria(data_path, sub_ses_test, patch_side
     return intensity_thresholds
 
 
-def extract_reg_quality_metrics_one_sub(input_path):
+def extract_reg_quality_metrics_one_sub(input_path: str) -> Tuple[float, float]:
     """This function extracts and returns the struct_2_tof registration quality metrics for one subject.
     Args:
-        input_path (str): path to folder where the registration quality metrics are stored for this subject
+        input_path: path to folder where the registration quality metrics are stored for this subject
     Returns:
-        struct_2_tof_nc (float): neighborhood correlation metric for the struct_2_tof registration of this subject
-        struct_2_tof_mi (float): mattes mutual information metric for the struct_2_tof registration of this subject
+        struct_2_tof_nc: neighborhood correlation metric for the struct_2_tof registration of this subject
+        struct_2_tof_mi: mattes mutual information metric for the struct_2_tof registration of this subject
     """
     for files in os.listdir(input_path):
         if "struct2tof" in files:
@@ -418,15 +433,15 @@ def extract_reg_quality_metrics_one_sub(input_path):
     return struct_2_tof_nc, struct_2_tof_mi
 
 
-def retrieve_registration_params(registration_dir_):
+def retrieve_registration_params(registration_dir_: str) -> Tuple[str, str, str, str]:
     """This function retrieves the registration parameters for each subject
     Args:
-        registration_dir_ (str): path to folder containing the registration parameters of each subject
+        registration_dir_: path to folder containing the registration parameters of each subject
     Returns:
-        mni_2_T1_mat_path_ (str): path to .mat file corresponding to the MNI --> struct registration
-        struct_2_tof_mat_path_ (str): path to .mat file corresponding to the struct --> TOF registration
-        mni_2_T1_warp_path_ (str): path to warp field corresponding to the MNI --> struct registration
-        mni_2_T1_inverse_warp_path_ (str): path to inverse warp field corresponding to the MNI --> struct registration
+        mni_2_T1_mat_path_: path to .mat file corresponding to the MNI --> struct registration
+        struct_2_tof_mat_path_: path to .mat file corresponding to the struct --> TOF registration
+        mni_2_T1_warp_path_: path to warp field corresponding to the MNI --> struct registration
+        mni_2_T1_inverse_warp_path_: path to inverse warp field corresponding to the MNI --> struct registration
     Raises:
         AssertionError: if input path does not exist
         AssertionError: if more (or less) than 4 registration paths are retrieved
@@ -470,17 +485,20 @@ def retrieve_registration_params(registration_dir_):
     return mni_2_t1_mat_path_, struct_2_tof_mat_path_, mni_2_t1_warp_path_, mni_2_t1_inverse_warp_path_
 
 
-def resample_volume(volume_path, new_spacing, out_path, interpolator=sitk.sitkLinear):
+def resample_volume(volume_path: str,
+                    new_spacing: list,
+                    out_path: str,
+                    interpolator: int = sitk.sitkLinear) -> Tuple[sitk.Image, nib.Nifti1Image, np.ndarray]:
     """This function resamples the input volume to a specified voxel spacing
     Args:
-        volume_path (str): input volume path
-        new_spacing (list): desired voxel spacing that we want
-        out_path (str): path where we temporarily save the resampled output volume
-        interpolator (int): interpolator that we want to use (e.g. 1= NearNeigh., 2=linear, ...)
+        volume_path: input volume path
+        new_spacing: desired voxel spacing that we want
+        out_path: path where we temporarily save the resampled output volume
+        interpolator: interpolator that we want to use (e.g. 1= NearNeigh., 2=linear, ...)
     Returns:
-        resampled_volume_sitk_obj (sitk.Image): resampled volume as sitk object
-        resampled_volume_nii_obj (nib.Nifti1Image): resampled volume as nib object
-        resampled_volume_nii (np.ndarray): resampled volume as numpy array
+        resampled_volume_sitk_obj: resampled volume as sitk object
+        resampled_volume_nii_obj: resampled volume as nib object
+        resampled_volume_nii: resampled volume as numpy array
     """
     volume = sitk.ReadImage(volume_path)  # read volume
     original_size = volume.GetSize()  # extract size
@@ -497,20 +515,24 @@ def resample_volume(volume_path, new_spacing, out_path, interpolator=sitk.sitkLi
     return resampled_volume_sitk_obj, resampled_volume_nii_obj, resampled_volume_nii
 
 
-def load_nifti_and_resample(volume_path, tmp_folder_, out_name, new_spacing_, binary_mask=False):
+def load_nifti_and_resample(volume_path: str,
+                            tmp_folder_: str,
+                            out_name: str,
+                            new_spacing_: list,
+                            binary_mask: bool = False) -> Tuple[sitk.Image, nib.Nifti1Image, np.ndarray, np.ndarray]:
     """This function loads a nifti volume, resamples it to a specified voxel spacing, and returns both
     the resampled nifti object and the resampled volume as numpy array, together with the affine matrix
     Args:
-        volume_path (str): path to nifti volume
-        tmp_folder_ (str): path to folder where we temporarily save the resampled volume
-        out_name (str): name of resampled volume temporarily saved to disk
-        new_spacing_ (list): desired voxel spacing for output volume
-        binary_mask (bool): defaults to False. If set to True, it means that the volume is a binary mask
+        volume_path: path to nifti volume
+        tmp_folder_: path to folder where we temporarily save the resampled volume
+        out_name: name of resampled volume temporarily saved to disk
+        new_spacing_: desired voxel spacing for output volume
+        binary_mask: defaults to False. If set to True, it means that the volume is a binary mask
     Returns:
-        resampled_volume_obj_nib (Nifti1Image): nibabel object of resampled output volume
-        resampled_volume (np.ndarray): resampled output volume
-        aff_matrix (np.ndarray): affine matrix associated with resampled output volume
-        resampled_volume_obj_sitk (sitk.Image): sitk object of resampled output volume
+        resampled_volume_obj_sitk: sitk object of resampled output volume
+        resampled_volume_obj_nib: nibabel resampled output volume
+        resampled_volume: numpy resampled output volume
+        aff_matrix: affine matrix associated with resampled output volume
     """
     create_dir_if_not_exist(tmp_folder_)  # if directory does not exist, create it
 
@@ -521,31 +543,26 @@ def load_nifti_and_resample(volume_path, tmp_folder_, out_name, new_spacing_, bi
         resampled_volume_obj_sitk, resampled_volume_obj_nib, resampled_volume = resample_volume(volume_path, new_spacing_, out_path, interpolator=sitk.sitkLinear)
     assert len(resampled_volume.shape) == 3, "Nifti volume is not 3D"
     aff_matrix = resampled_volume_obj_nib.affine  # extract and save affine matrix
+
     return resampled_volume_obj_sitk, resampled_volume_obj_nib, resampled_volume, aff_matrix
 
 
-def round_half_up(n: float, decimals: int = 0):
-    """This function rounds to the nearest integer number (e.g 2.4 becomes 2.0 and 2.6 becomes 3);
-     in case of tie, it rounds up (e.g. 1.5 becomes 2.0 and not 1.0)
-    Args:
-        n (float): number to round
-        decimals (int): number of decimal figures that we want to keep; defaults to zero
-    """
-    multiplier = 10 ** decimals
-    return math.floor(n*multiplier + 0.5) / multiplier
-
-
-def convert_angio_to_mni(original_angio_volume_sitk_, voxel_space_angio_coords, mni_2_struct_mat_path_, struct_2_tof_mat_path_, mni_2_struct_warp_path_, tmp_path):
+def convert_angio_to_mni(original_angio_volume_sitk_: sitk.Image,
+                         voxel_space_angio_coords: list,
+                         mni_2_struct_mat_path_: str,
+                         struct_2_tof_mat_path_: str,
+                         mni_2_struct_warp_path_: str,
+                         tmp_path: str) -> list:
     """This function takes as input a point [i,j,k] in angio voxel space and returns the corresponding [x,y,z] point in mm but registered in mni space.
     Args:
-        original_angio_volume_sitk_ (sitk.Image): original angio volume loaded with sitk
-        voxel_space_angio_coords (list): [i,j,k] voxel coordinate that must be registered from angio space to mni space
-        mni_2_struct_mat_path_ (str): path to MNI_2_struct .mat file
-        struct_2_tof_mat_path_ (str): path to struct_2_TOF .mat file
-        mni_2_struct_warp_path_ (str): path to mni_2_struct warp field
-        tmp_path (str): path to folder where we save temporary registration files
+        original_angio_volume_sitk_: original angio volume loaded with sitk
+        voxel_space_angio_coords: [i,j,k] voxel coordinate that must be registered from angio space to mni space
+        mni_2_struct_mat_path_: path to MNI_2_struct .mat file
+        struct_2_tof_mat_path_: path to struct_2_TOF .mat file
+        mni_2_struct_warp_path_: path to mni_2_struct warp field
+        tmp_path: path to folder where we save temporary registration files
     Returns:
-        mm_coord_mni (np.ndarray): [x,y,z] mm coordinate in mni space
+        center_mm_coord_mni: [x,y,z] mm coordinate in mni space
     """
     center_mm_coord = list(original_angio_volume_sitk_.TransformIndexToPhysicalPoint(voxel_space_angio_coords))  # convert coordinate from voxel space to physical space (mm)
     center_mm_coord.append(0)  # we put 0 in the time variable, because ANTs requires the coordinates to be in the shape [x, y, z, t] in physical space
@@ -610,13 +627,15 @@ def convert_angio_to_mni(original_angio_volume_sitk_, voxel_space_angio_coords, 
     return center_mm_coord_mni
 
 
-def distance_is_plausible(patch_center_coordinates_physical_space, df_landmarks_tof_space, distances_thresholds):
+def distance_is_plausible(patch_center_coordinates_physical_space: list,
+                          df_landmarks_tof_space: pd.DataFrame,
+                          distances_thresholds: list) -> bool:
     """This function takes as input the center of a candidate patch in angio voxel space and computes the distances from this point to a series of landmarks points
     (also warped to tof space) where aneurysms are recurrent. Then it returns True if the min and mean distances are within plausible ranges, otherwise it returns False.
     Args:
-        patch_center_coordinates_physical_space (list): [x,y,z] physical coordinate of the patch center
-        df_landmarks_tof_space (pd.Dataframe): it contains the 3D coordinates of the landmark points where aneurysms are most recurrent (in physical tof space)
-        distances_thresholds (list): it contains the thresholds to use for the distances to the landmark points
+        patch_center_coordinates_physical_space: [x,y,z] physical coordinate of the patch center
+        df_landmarks_tof_space: it contains the 3D coordinates of the landmark points where aneurysms are most recurrent (in physical tof space)
+        distances_thresholds: it contains the thresholds to use for the distances to the landmark points
     Returns:
         True: if distances are within plausible ranges for aneurysms (ranges were computed empirically)
         False: if distances are not within plausible ranges for aneurysms (ranges were computed empirically)
@@ -636,8 +655,17 @@ def distance_is_plausible(patch_center_coordinates_physical_space, df_landmarks_
     return True if (min_dist < distances_thresholds[0] and mean_dist < distances_thresholds[1]) else False
 
 
-def extracting_conditions_are_met(angio_patch_after_bet_scale_1_, vessel_mni_patch_, vessel_mni_volume_, nii_volume_, patch_center_coordinates_physical_space,
-                                  patch_side_scale_1, df_landmarks_tof_space, registration_accurate_enough, intensity_thresholds, distances_thresholds, anatomically_informed):
+def extracting_conditions_are_met(angio_patch_after_bet_scale_1_: np.ndarray,
+                                  vessel_mni_patch_: np.ndarray,
+                                  vessel_mni_volume_: np.ndarray,
+                                  nii_volume_: np.ndarray,
+                                  patch_center_coordinates_physical_space: list,
+                                  patch_side_scale_1: int,
+                                  df_landmarks_tof_space: pd.DataFrame,
+                                  registration_accurate_enough: bool,
+                                  intensity_thresholds: list,
+                                  distances_thresholds: list,
+                                  anatomically_informed: bool) -> bool:
     """ This function checks whether the candidate patch fulfills specific extraction conditions. There are 6 main conditions checked:
         1) the corresponding vesselMNI patch must have intensity ratios (local and global) similar to positive patches (thresholds found empirically from pos. patches)
         2) the corresponding vesselMNI patch must have at least K non-zero voxels (K found empirically from pos. patches)
@@ -646,19 +674,19 @@ def extracting_conditions_are_met(angio_patch_after_bet_scale_1_, vessel_mni_pat
         5) the neigh_corr quality metric of this subject must be above the 10th percentile of the distribution of all neigh_corr in the dataset. If it's not, there was probably a registration mistake
         6) the mutual_inf quality metric of this subject must be below the 90th percentile of the distribution of all mutual_inf in the dataset. If it's not, there was probably a registration mistake
     Args:
-        angio_patch_after_bet_scale_1_ (np.ndarray): small-scale angio patch
-        vessel_mni_patch_ (np.ndarray): corresponding vessel mni patch of same dims of angio patch
-        vessel_mni_volume_ (np.ndarray): vessel mni volume of this subject resampled to uniform voxel space
-        nii_volume_ (np.ndarray): BET angio volume (i.e. after brain extraction) resampled to uniform voxel space
-        patch_center_coordinates_physical_space (list): it contains the 3D physical (in mm) center coordinate of this candidate patch
-        patch_side_scale_1 (int): side of sliding-window patches
-        df_landmarks_tof_space (pd.Dataframe): it contains the 3D coordinates of the landmark points where aneurysms are most recurrent (in physical tof space)
-        registration_accurate_enough (bool): it indicates whether the registration accuracy is high enough to perform the anatomically-informed sliding window
-        intensity_thresholds (list): it contains the thresholds for the intensity conditions, namely [q5_local_vessel_mni, q5_global_vessel_mni, q5_local_tof_bet, q5_global_tof_bet, q5_nz_vessel_mni]
-        distances_thresholds (list): it contains the thresholds for the distances from the patch centers to the landmark points
-        anatomically_informed (bool) whether to conduct the sliding-window in an anatomically-informed fashion or not
+        angio_patch_after_bet_scale_1_: small-scale angio patch
+        vessel_mni_patch_: corresponding vessel mni patch of same dims of angio patch
+        vessel_mni_volume_: vessel mni volume of this subject resampled to uniform voxel space
+        nii_volume_: BET angio volume (i.e. after brain extraction) resampled to uniform voxel space
+        patch_center_coordinates_physical_space: it contains the 3D physical (in mm) center coordinate of this candidate patch
+        patch_side_scale_1: side of sliding-window patches
+        df_landmarks_tof_space: it contains the 3D coordinates of the landmark points where aneurysms are most recurrent (in physical tof space)
+        registration_accurate_enough: it indicates whether the registration accuracy is high enough to perform the anatomically-informed sliding window
+        intensity_thresholds: it contains the thresholds for the intensity conditions, namely [q5_local_vessel_mni, q5_global_vessel_mni, q5_local_tof_bet, q5_global_tof_bet, q5_nz_vessel_mni]
+        distances_thresholds: it contains the thresholds for the distances from the patch centers to the landmark points
+        anatomically_informed: whether to conduct the sliding-window in an anatomically-informed fashion or not
     Returns:
-        conditions_fulfilled (bool): initialized as False; if all extracting conditions are met, it becomes True
+        conditions_fulfilled: initialized as False; if all extracting conditions are met, it becomes True
     """
     conditions_fulfilled = False  # type: bool # initialize as False; then, if all sliding-window conditions are met, this will become True
 
@@ -712,13 +740,14 @@ def extracting_conditions_are_met(angio_patch_after_bet_scale_1_, vessel_mni_pat
     return conditions_fulfilled
 
 
-def create_tf_dataset(all_angio_patches_scale_1_numpy_list_, unet_batch_size):
+def create_tf_dataset(all_angio_patches_scale_1_numpy_list_: list,
+                      unet_batch_size: int) -> tf.data.Dataset:
     """This function creates a batched tf.data.Dataset from lists of numpy arrays containing small-scale tof and labels.
     Args:
-        all_angio_patches_scale_1_numpy_list_ (list): list containing all small_scale angio patches
-        unet_batch_size (int): batch size. Not really relevant (cause we're doing inference), but still needed
+        all_angio_patches_scale_1_numpy_list_: list containing all small_scale angio patches
+        unet_batch_size: batch size. Not really relevant (cause we're doing inference), but still needed
     Returns:
-        batched_dataset_ (tf.data.Dataset): batched dataset containing all samples and labels
+        batched_dataset_: batched dataset containing all samples and labels
     """
     all_patch_volumes_tensors_ = tf.convert_to_tensor(all_angio_patches_scale_1_numpy_list_, dtype=tf.float32)  # convert from list of numpy arrays to tf.Tensor
 
@@ -735,16 +764,18 @@ def create_tf_dataset(all_angio_patches_scale_1_numpy_list_, unet_batch_size):
     return batched_dataset_
 
 
-def save_volume_mask_to_disk(input_volume: np.ndarray, out_path: str, nii_aff: np.ndarray, output_filename: str, output_dtype: str = "float32"):
+def save_volume_mask_to_disk(input_volume: np.ndarray,
+                             out_path: str,
+                             nii_aff: np.ndarray,
+                             output_filename: str,
+                             output_dtype: str = "float32") -> None:
     """This function saves "input_volume" to disk
     Args:
-        input_volume (np.ndarray): volume to be saved
-        out_path (str): path where the volume will be saved
-        nii_aff (np.ndarray): affine matrix of volume that we want to save
-        output_filename (str): name to assign to the volume we save to disk
-        output_dtype (str): data type for volume that we want to save
-    Returns:
-        None
+        input_volume: volume to be saved
+        out_path: path where the volume will be saved
+        nii_aff: affine matrix of volume that we want to save
+        output_filename: name to assign to the volume we save to disk
+        output_dtype: data type for volume that we want to save
     """
     if output_dtype == "float32":
         input_volume = np.float32(input_volume)  # cast to float32
@@ -760,14 +791,17 @@ def save_volume_mask_to_disk(input_volume: np.ndarray, out_path: str, nii_aff: n
     nib.save(volume_obj, os.path.join(out_path, output_filename))  # save mask
 
 
-def reduce_fp_in_segm_map(txt_file_path, output_folder_path, out_filename, mapping_centers_masks):
+def reduce_fp_in_segm_map(txt_file_path: str,
+                          output_folder_path: str,
+                          out_filename: str,
+                          mapping_centers_nonzero_coords: dict) -> None:
     """This function removes the less probable predictions (i.e. connected components) basing on
     the corresponding txt file that contains the already-reduced predicted aneurysm centers
     Args:
-        txt_file_path (str): path to txt output file
-        output_folder_path (str): path to output folder for this subject
-        out_filename (str): filename of the output segmentation mask
-        mapping_centers_masks (dict): it contains the centers of the predictions as keys and the coordinates of non-zero voxels as values
+        txt_file_path: path to txt output file
+        output_folder_path: path to output folder for this subject
+        out_filename: filename of the output segmentation mask
+        mapping_centers_nonzero_coords: it contains the centers of the predictions as keys and the coordinates of non-zero voxels as values
     Raises:
         AssertionError: if the created segmentation mask is not binary
     """
@@ -781,11 +815,11 @@ def reduce_fp_in_segm_map(txt_file_path, output_folder_path, out_filename, mappi
         # loop over dataframe's rows
         for row_idxs in range(df_txt_file.shape[0]):
             pred_center = tuple(df_txt_file.iloc[row_idxs].values)  # extract row
-            non_zero_coords = mapping_centers_masks[pred_center]
-            new_segm_map[non_zero_coords] = 1
+            non_zero_coords = mapping_centers_nonzero_coords[pred_center]  # extract coordinates of nonzero voxels from dict
+            new_segm_map[non_zero_coords] = 1  # assign 1 to the voxels corresponding to this retained connected component
 
         # make sure that the new output mask is binary
-        assert np.array_equal(new_segm_map, new_segm_map.astype(bool)), "WATCH OUT: mask is not binary"
+        assert is_binary(new_segm_map), "WATCH OUT: mask is not binary"
 
         # sanity check: control that we have same number of connected components
         labels_out = cc3d.connected_components(np.asarray(new_segm_map, dtype=int))  # extract 3D connected components
@@ -800,18 +834,22 @@ def reduce_fp_in_segm_map(txt_file_path, output_folder_path, out_filename, mappi
         save_volume_mask_to_disk(new_segm_map, output_folder_path, binary_segm_map_obj.affine, out_filename, output_dtype="int32")
 
 
-def resample_volume_inverse(volume_path, new_spacing, new_size, out_path, interpolator=sitk.sitkLinear):
+def resample_volume_inverse(volume_path: str,
+                            new_spacing: list,
+                            new_size: list,
+                            out_path: str,
+                            interpolator: int = sitk.sitkLinear) -> Tuple[sitk.Image, nib.Nifti1Image, np.ndarray]:
     """This function resamples the input volume to a specified voxel spacing and to a new size
     Args:
-        volume_path (str): input volume path
-        new_spacing (list): desired voxel spacing that we want
-        new_size (list): size of output volume
-        out_path (str): path where we temporarily save the resampled output volume
-        interpolator (int): interpolator that we want to use (e.g. 1=NearNeigh., 2=linear, ...)
+        volume_path: input volume path
+        new_spacing: desired voxel spacing that we want
+        new_size: size of output volume
+        out_path: path where we temporarily save the resampled output volume
+        interpolator: interpolator that we want to use (e.g. 1=NearNeigh., 2=linear, ...)
     Returns:
-        resampled_volume_sitk_obj (sitk.Image): resampled volume as sitk object
-        resampled_volume_nii_obj (nib.Nifti1Image): resampled volume as nib object
-        resampled_volume_nii (np.ndarray): resampled volume as numpy array
+        resampled_volume_sitk_obj: resampled volume as sitk object
+        resampled_volume_nii_obj: resampled volume as nib object
+        resampled_volume_nii: resampled volume as numpy array
     """
     volume = sitk.ReadImage(volume_path)  # read volume
     resampled_volume_sitk_obj = sitk.Resample(volume, new_size, sitk.Transform(), interpolator,
@@ -825,39 +863,129 @@ def resample_volume_inverse(volume_path, new_spacing, new_size, out_path, interp
     return resampled_volume_sitk_obj, resampled_volume_nii_obj, resampled_volume_nii
 
 
-def create_txt_output_file_and_remove_dark_fp(output_volume_path, txt_file_path, original_bfc_bet_tof, remove_dark_fp, dark_fp_threshold):
+def create_second_txt_output_file_with_average_brightness(txt_file_path: str,
+                                                          mapping_centers_avg_brightness: dict,
+                                                          mapping_centers_count_nonzero_voxels: dict) -> str:
+    """This function creates a second .txt file that contains the centers of the predictions (connected components)
+    plus the mean brightness of each prediction. For instance a row will be [152, 78, 80, 0.76] with [152, 78, 80]
+    being the center of the prediction and 0.76 the mean brightness for this prediction
+    Args:
+        txt_file_path: path to first .txt file (the one that only contains the centers of the prediction)
+        mapping_centers_avg_brightness: it contains the average brightness for each connected component
+        mapping_centers_count_nonzero_voxels: dict that has as keys the prediction centers and as values the number of nonzero voxels of each connected component
+    Returns:
+        second_txt_path: path to second txt file that contains the centers of the connected components and the corresponding average brightness
+    """
+    # create new filename for second .txt file
+    second_txt_path = txt_file_path.replace("result", "result_with_avg_brightness")
+
+    # create the new (second) txt file with the "with" statement
+    with open(second_txt_path, "w") as txt_file:
+        # if the output file is not empty (i.e. there's at least one predicted aneurysm location)
+        if not os.stat(txt_file_path).st_size == 0:
+            # load old .txt file with pandas
+            df_first_txt_file = pd.read_csv(txt_file_path, header=None)  # type: pd.DataFrame
+            assert df_first_txt_file.shape[0] == len(mapping_centers_avg_brightness), "The rows in the dataframe of result.txt should correspond to the elements in the mapping dict"
+            # create csv writer
+            wr_centers_plus_brightness = csv.writer(txt_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)  # type: csv.writer
+            # loop over dataframe rows
+            for _, center_coords in df_first_txt_file.iterrows():
+                # extract center as list
+                pred_center_plus_count_nonzero_plus_average_brightness = list(center_coords)  # type: list
+                # append corresponding number of nonzero voxels
+                pred_center_plus_count_nonzero_plus_average_brightness.append(mapping_centers_count_nonzero_voxels[tuple(center_coords)])  # type: list
+                # append corresponding average brightness, rounded to 2 decimal digits and multiplied by 100 to obtain a % probability
+                pred_center_plus_count_nonzero_plus_average_brightness.append(np.round_(mapping_centers_avg_brightness[tuple(center_coords)], decimals=2) * 100)  # type: list
+                # write center + count_nonzero_voxels + avg. brightness to disk as a row
+                wr_centers_plus_brightness.writerow(np.asarray(pred_center_plus_count_nonzero_plus_average_brightness, dtype=int))
+
+    assert os.path.exists(second_txt_path), "Path {} does not exist".format(second_txt_path)
+
+    return second_txt_path
+
+
+def save_txt_plus_mapping_centers_nonzero_voxels_plus_avg_brightness(extracted_image: np.ndarray,
+                                                                     wr: csv.writer,
+                                                                     mapping_centers_nonzero_coords: dict,
+                                                                     mapping_centers_avg_brightness: dict,
+                                                                     mapping_centers_count_nonzero_voxels: dict) -> Tuple[dict, dict, dict]:
+    """This function saves one prediction (specifically one row of the result.txt output file) to disk. The center of the prediction
+    is computed from the probabilistic connected component cause in theory it's more accurate than the binarized mask. Also, this function
+    updates the dict mapping that contains as keys the prediction centers and as values the coordinates of the nonzero voxels. Plus, it
+    also updates the dict that contains as keys the prediction centers and as values the average intensity of each precision (i.e. of each
+    connected component). Plus it updates the dict that contains as keys the prediction centers and as values the count of nonzero voxels.
+    Args:
+        extracted_image: the output segmentation volume with only one probabilistic prediction (i.e. one probabilistic connected component)
+        wr: the writer that we use to save the center of mass of each prediction
+        mapping_centers_nonzero_coords: dict that has as keys the prediction centers and as values the coordinates of the nonzero voxels of each connected component
+        mapping_centers_avg_brightness: dict that has as keys the prediction centers and as values the average intensity of each connected component
+        mapping_centers_count_nonzero_voxels: dict that has as keys the prediction centers and as values the number of nonzero voxels of each connected component
+    Returns:
+        mapping_centers_nonzero_coords: the updated dict
+        mapping_centers_avg_brightness: the updated dict
+        mapping_centers_count_nonzero_voxels: the updated dict
+    """
+    # extract voxel coordinates of the center of the predicted lesion
+    predicted_center = center_of_mass(extracted_image)  # type: tuple
+    # round to closest int
+    pred_center_tof_space = [round_half_up(x) for x in predicted_center]  # type: list
+    # cast to int
+    pred_center_tof_space_int = np.asarray(pred_center_tof_space, dtype=int)  # type: np.ndarray
+    # write aneurysm center as a row
+    wr.writerow(pred_center_tof_space_int)
+
+    # update mapping; it contains the centers of the predictions as keys and the coordinates of non-zero voxels as values
+    mapping_centers_nonzero_coords[tuple(pred_center_tof_space_int)] = np.nonzero(extracted_image)
+
+    # compute average intensity of this predicted aneurysm
+    avg_brightness_prob_larg_conn_comp = np.mean(extracted_image[np.nonzero(extracted_image)])
+    mapping_centers_avg_brightness[tuple(pred_center_tof_space_int)] = avg_brightness_prob_larg_conn_comp
+
+    # update mapping that counts the number of nonzero voxels per connected component
+    mapping_centers_count_nonzero_voxels[tuple(pred_center_tof_space_int)] = np.count_nonzero(extracted_image)
+
+    return mapping_centers_nonzero_coords, mapping_centers_avg_brightness, mapping_centers_count_nonzero_voxels
+
+
+def create_txt_output_file_and_remove_dark_fp(output_volume_path: str,
+                                              txt_file_path: str,
+                                              original_bfc_bet_tof: np.ndarray,
+                                              remove_dark_fp: bool,
+                                              dark_fp_threshold: float) -> Tuple[np.ndarray, dict, dict, str, dict]:
     """This function creates the output txt file used for the detection task and returns the binarized segmentation output volume
     Args:
-        output_volume_path (str): path to output segmentation volume
-        txt_file_path (str): path of detection output file
-        original_bfc_bet_tof (np.ndarray): original bias-field-corrected volume after brain extraction before resampling
-        remove_dark_fp (bool): if set to True, candidate aneurysms that are not brighter than a certain threshold (on average) are discarded
-        dark_fp_threshold (float): threshold used to remove predictions which are on average too dark for being a true aneurysm
+        output_volume_path: path to output segmentation volume
+        txt_file_path: path of detection output file
+        original_bfc_bet_tof: original bias-field-corrected volume after brain extraction before resampling
+        remove_dark_fp: if set to True, candidate aneurysms that are not brighter than a certain threshold (on average) are discarded
+        dark_fp_threshold: threshold used to remove predictions which are on average too dark for being a true aneurysm
     Returns:
-        binary_output_segm_map (np.ndarray): binary output segmentation mask
-        avg_brightness_predicted_aneurysms (list): it contains the mean brightness of non-zero-voxels of the retained candidate aneurysms
-        mapping_centers_masks (dict): it contains the centers of the predictions as keys and the coordinates of non-zero voxels as values; used later for FP reduction
+        binary_output_segm_map: binary output segmentation mask
+        mapping_centers_avg_brightness: it contains the centers of the predictions as keys and the mean brightness of non-zero-voxels of the retained candidate aneurysms as values
+        mapping_centers_nonzero_coords: it contains the centers of the predictions as keys and the coordinates of non-zero voxels as values; used later for FP reduction
+        second_txt_path: path to second txt output file that contains the centers of the predictions and the corresponding average brightness
+        mapping_centers_count_nonzero_voxels: it contains the centers of the predictions as keys and the count of nonzero voxels per conn. comp. as value
     """
     probabilistic_out_segm_map_obj = nib.load(output_volume_path)  # type: nib.Nifti1Image # load output segmentation with nibabel
     probabilistic_out_segm_map = np.asanyarray(probabilistic_out_segm_map_obj.dataobj)  # type: np.ndarray # extract numpy array
 
     # assign 1 to voxels that are non-zero
     binary_output_segm_map = np.asarray(np.where(probabilistic_out_segm_map != 0, 1, 0), dtype=int)
-    # binary_output_segm_map = np.asarray(np.where(probabilistic_out_segm_map >= unet_threshold, 1, 0), dtype=int)
 
-    labels_out = cc3d.connected_components(binary_output_segm_map)
-    numb_labels = np.max(labels_out)  # extract number of different connected components found
+    labels_out = cc3d.connected_components(binary_output_segm_map)  # create volume with connected components
+    numb_labels = np.max(labels_out)  # compute number of different connected components found
 
     # create output txt file
     with open(txt_file_path, "w") as txt_file:
-        wr = csv.writer(txt_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-        avg_brightness_predicted_aneurysms = []  # type: list # will contain the mean brightness of non-zero-voxels of the retained candidate aneurysms
-        mapping_centers_masks = {}  # type: dict # create a map between a predicted center and the corresponding connected components; will be used later for the FP reduction
+        wr_centers = csv.writer(txt_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)  # type: csv.writer
+        mapping_centers_avg_brightness = {}  # type: dict # create a map between a predicted center and its corresponding mean brightness; will be used later for FP reduction
+        mapping_centers_nonzero_coords = {}  # type: dict # create a map between a predicted center and the corresponding nonzero coordinates; will be used later for FP reduction
+        mapping_centers_count_nonzero_voxels = {}  # type: dict # create a map between a predicted center and the corresponding number of nonzero voxels
         # loop over different conn. components
         for seg_id in range(1, numb_labels + 1):
-            # extract connected component from the probabilistic predicted volume
+            # extract one connected component from the probabilistic predicted volume
             extracted_image = probabilistic_out_segm_map * (labels_out == seg_id)
-            # extract same connected component but from original bias-field-corrected tof volume after brain extraction
+            # extract the same connected component but from original bias-field-corrected tof volume after brain extraction
             extracted_original_bet_tof = original_bfc_bet_tof * (labels_out == seg_id)
             assert extracted_image.shape == extracted_original_bet_tof.shape
             assert np.max(extracted_image) <= 1, "This should be a probabilistic map with values between 0 and 1"
@@ -869,47 +997,40 @@ def create_txt_output_file_and_remove_dark_fp(output_volume_path, txt_file_path,
                 # compute ratio between mean intensity of predicted aneurysm voxels and the xxth intensity percentile of the entire skull-stripped image
                 intensity_ratio = np.mean(non_zero_voxels_intensities) / p90
                 if intensity_ratio > dark_fp_threshold:
-                    # extract voxel coordinates of the center of the predicted lesion
-                    predicted_center = center_of_mass(extracted_image)  # type: tuple
-                    # round to closest int
-                    pred_center_tof_space = [round_half_up(x) for x in predicted_center]  # type: list
-                    pred_center_tof_space_int = np.asarray(pred_center_tof_space, dtype=int)  # type: np.ndarray # cast to int
-                    wr.writerow(pred_center_tof_space_int)  # write aneurysm center as a row
 
-                    # update mapping; it contains the centers of the predictions as keys and the coordinates of non-zero voxels as values
-                    mapping_centers_masks[tuple(pred_center_tof_space_int)] = np.nonzero(extracted_image)
-
-                    # compute average intensity of this predicted aneurysm
-                    avg_brightness_prob_larg_conn_comp = np.mean(extracted_image[np.nonzero(extracted_image)])
-                    avg_brightness_predicted_aneurysms.append(avg_brightness_prob_larg_conn_comp)
+                    mapping_centers_nonzero_coords, mapping_centers_avg_brightness,\
+                        mapping_centers_count_nonzero_voxels = save_txt_plus_mapping_centers_nonzero_voxels_plus_avg_brightness(extracted_image,
+                                                                                                                                wr_centers,
+                                                                                                                                mapping_centers_nonzero_coords,
+                                                                                                                                mapping_centers_avg_brightness,
+                                                                                                                                mapping_centers_count_nonzero_voxels)
 
             # if instead we do not discard dark fp predictions
             else:
-                # extract voxel coordinates of the center of the predicted lesion
-                predicted_center = center_of_mass(extracted_image)  # type: tuple
-                # round to closest int
-                pred_center_tof_space = [round_half_up(x) for x in predicted_center]  # type: list
-                pred_center_tof_space_int = np.asarray(pred_center_tof_space, dtype=int)  # type: np.ndarray # cast to int
-                wr.writerow(pred_center_tof_space_int)  # write aneurysm center as a row
+                mapping_centers_nonzero_coords, mapping_centers_avg_brightness,\
+                    mapping_centers_count_nonzero_voxels = save_txt_plus_mapping_centers_nonzero_voxels_plus_avg_brightness(extracted_image,
+                                                                                                                            wr_centers,
+                                                                                                                            mapping_centers_nonzero_coords,
+                                                                                                                            mapping_centers_avg_brightness,
+                                                                                                                            mapping_centers_count_nonzero_voxels)
 
-                # update mapping; it contains the centers of the predictions as keys and the coordinates of non-zero voxels as values
-                mapping_centers_masks[tuple(pred_center_tof_space_int)] = np.nonzero(extracted_image)
+    # create a second txt output file that still contains the centers of the connected components, but also includes the average brightness for each conn. comp.
+    second_txt_path = create_second_txt_output_file_with_average_brightness(txt_file_path,
+                                                                            mapping_centers_avg_brightness,
+                                                                            mapping_centers_count_nonzero_voxels)
 
-                # compute average intensity of this predicted aneurysm
-                avg_brightness_prob_larg_conn_comp = np.mean(extracted_image[np.nonzero(extracted_image)])
-                avg_brightness_predicted_aneurysms.append(avg_brightness_prob_larg_conn_comp)
-
-    return binary_output_segm_map, avg_brightness_predicted_aneurysms, mapping_centers_masks
+    return binary_output_segm_map, mapping_centers_avg_brightness, mapping_centers_nonzero_coords, second_txt_path, mapping_centers_count_nonzero_voxels
 
 
-def extract_largest_conn_comp(predicted_patch, predicted_patch_thresholded_binary):
+def extract_largest_conn_comp(predicted_patch: np.ndarray,
+                              predicted_patch_thresholded_binary: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """This function takes as input the predicted patch and its binary version and returns the same patches but only with the largest connected component
     Args:
-        predicted_patch (np.ndarray): probabilistic predicted patch
-        predicted_patch_thresholded_binary (np.ndarray): thresholded binary version of predicted patch
+        predicted_patch: probabilistic predicted patch
+        predicted_patch_thresholded_binary: thresholded binary version of predicted patch
     Returns:
-        probabilistic_largest_conn_comp (np.ndarray): probabilistic predicted patch with only the largest connected component
-        binary_largest_conn_comp (np.ndarray): thresholded binary version of predicted patch with only the largest connected component
+        probabilistic_largest_conn_comp: probabilistic predicted patch with only the largest connected component
+        binary_largest_conn_comp: thresholded binary version of predicted patch with only the largest connected component
     """
     # find connected components in 3D numpy array; each connected component will be assigned a label starting from 1 and then increasing, 2, 3, etc.
     labels_out = cc3d.connected_components(np.asarray(predicted_patch_thresholded_binary, dtype=int))
@@ -930,42 +1051,75 @@ def extract_largest_conn_comp(predicted_patch, predicted_patch_thresholded_binar
     return probabilistic_largest_conn_comp, binary_largest_conn_comp
 
 
-def reduce_false_positives(txt_file_path, mean_brightness_retained_patches, max_fp, output_folder_path, out_filename, mapping_centers_masks):
-    """If more than "max_fp" candide centers were predicted, this function reduces this number to exactly "max_fp", retaining only the most probable
-    (i.e. brightest) candidate aneurysm centers. The rationale behind this choice is that it's extremely unlikely that a subject has more than "max_fp"
-    aneurysms in one scan.
+def reduce_false_positives(txt_file_path: str,
+                           mapping_centers_avg_brightness: dict,
+                           max_fp: int,
+                           output_folder_path: str,
+                           out_filename: str,
+                           mapping_centers_nonzero_coords: dict,
+                           second_txt_path: str,
+                           mapping_centers_count_nonzero_voxels: dict) -> None:
+    """If more than "max_fp" candide centers were predicted, this function reduces this number to exactly "max_fp", retaining only the most probable (i.e. brightest)
+    candidate aneurysm centers. The rationale behind this choice is that it's extremely unlikely that a subject has more than "max_fp" aneurysms in one scan.
     Args:
-        txt_file_path (str): path to the output txt file
-        mean_brightness_retained_patches (list): contains the average intensity of the patches corresponding to the predicted centers
-        max_fp (int): maximum allowed number of aneurysms per patient
-        output_folder_path (str): path to output folder for this subject
-        out_filename (str): filename of the output segmentation mask
-        mapping_centers_masks (dict): it contains the centers of the predictions as keys and the coordinates of non-zero voxels as values
-    Returns:
-        None
+        txt_file_path: path to the output txt file
+        mapping_centers_avg_brightness: it contains the centers of the predictions as keys and the average intensity of the patches corresponding to the predicted centers as values
+        max_fp: maximum allowed number of aneurysms per patient
+        output_folder_path: path to output folder for this subject
+        out_filename: filename of the output segmentation mask
+        mapping_centers_nonzero_coords: it contains the centers of the predictions as keys and the coordinates of non-zero voxels as values
+        second_txt_path: path to second txt output file that contains the centers of the predictions and the corresponding average brightness
+        mapping_centers_count_nonzero_voxels: it contains the centers of the predictions as keys and the count of nonzero voxels per conn. comp. as values
     Raises:
-        AssertionError: if input path does not exist
+        AssertionError: if path to .txt file does not exist
     """
     assert os.path.exists(txt_file_path), "Path {} does not exist".format(txt_file_path)
     if not os.stat(txt_file_path).st_size == 0:  # if the output file is not empty (i.e. there's at least one predicted aneurysm location)
         df_txt_file = pd.read_csv(txt_file_path, header=None)  # type: pd.DataFrame # load txt file with pandas
-        new_rows = []  # type: list # will contain the new rows of the output file
-        if df_txt_file.shape[0] > max_fp:  # if the dataframe has more than max_fp rows (i.e. if there are more than max_fp predicted aneurysms)
-            # find indexes corresponding to the "max_fp" most probable aneurysms (i.e. the brightest)
-            idxs_brightest_patches = sorted(range(len(mean_brightness_retained_patches)), key=lambda k: mean_brightness_retained_patches[k])[-max_fp:]
-            for idx in idxs_brightest_patches:
-                lesion_center = np.asarray(df_txt_file.iloc[idx])
-                new_rows.append(lesion_center)
+        reduced_centers = []  # type: list # will contain the max_fp most probable (highest brightness) centers
+        reduced_centers_plus_count_nonzero_plus_brightness = []  # type: list # will contain the max_fp most probable (highest brightness) centers + the corresponding average brightness
 
-            # save modified txt file (it overwrites the previous one by default)
-            np.savetxt(txt_file_path, np.asarray(new_rows), delimiter=",", fmt='%i')
+        if df_txt_file.shape[0] > max_fp:  # if the dataframe has more than max_fp rows (i.e. if there are more than max_fp predicted aneurysms)
+
+            # sort predictions from most probable to least probable according to average brightness (we consider the brightest as the most probable)
+            sorted_mapping_centers_avg_brightness = sort_dict_by_value(mapping_centers_avg_brightness, reverse=True)
+
+            # only take the first max_fp predictions (i.e. the most probable); to slice the dict, we first convert to list, then slice it, and then re-convert to dict
+            sorted_mapping_centers_avg_brightness_cropped = dict(list(sorted_mapping_centers_avg_brightness.items())[:max_fp])
+
+            # iterate over sorted dictionary
+            for center, avg_brightness in sorted_mapping_centers_avg_brightness_cropped.items():
+                # create rows of new .txt file with updated centers
+                center_np = np.asarray(center, dtype=int)  # ensure dtype
+                reduced_centers.append(center_np)  # append to external list
+
+                # create rows of new .txt file with updated centers and corresponding average brightness
+                center_as_list = list(center)  # convert to list
+                center_as_list.append(mapping_centers_count_nonzero_voxels[tuple(center)])  # append number of nonzero voxels
+                center_as_list.append(np.round_(avg_brightness, decimals=2) * 100)  # append average brightness and multiply by 100 to obtain a % probability
+                reduced_centers_plus_count_nonzero_plus_brightness.append(np.asarray(center_as_list, dtype=int))  # append to external list
+
+            # save first modified txt file (it overwrites the previous one by default)
+            np.savetxt(txt_file_path, np.asarray(reduced_centers), delimiter=",", fmt='%i')
+
+            # save second modified txt file (it overwrites the previous one by default)
+            np.savetxt(second_txt_path, np.asarray(reduced_centers_plus_count_nonzero_plus_brightness), delimiter=",", fmt='%i')
 
             # also remove less probable connected components from segmentation map
-            reduce_fp_in_segm_map(txt_file_path, output_folder_path, out_filename, mapping_centers_masks)
+            reduce_fp_in_segm_map(txt_file_path, output_folder_path, out_filename, mapping_centers_nonzero_coords)
 
 
-def save_output_mask_and_output_location(segm_map_resampled, output_folder_path_, aff_mat_resampled, orig_bfc_angio_sitk, tmp_path,
-                                         txt_file_path, original_bet_bfc_angio, remove_dark_fp, reduce_fp, max_fp, dark_fp_threshold):
+def save_output_mask_and_output_location(segm_map_resampled,
+                                         output_folder_path_,
+                                         aff_mat_resampled,
+                                         orig_bfc_angio_sitk,
+                                         tmp_path,
+                                         txt_file_path,
+                                         original_bet_bfc_angio,
+                                         remove_dark_fp,
+                                         reduce_fp,
+                                         max_fp,
+                                         dark_fp_threshold) -> None:
     """This function saves the output mask (resampled back to original space) to disk. Plus, it also saves the corresponding location file (with the candidate aneurysm(s) center(s))
     Args:
         segm_map_resampled (np.ndarray): resampled segmentation map to save
@@ -979,8 +1133,6 @@ def save_output_mask_and_output_location(segm_map_resampled, output_folder_path_
         reduce_fp (bool): if set to true, we only retain the "max_fp" most probable aneurysm candidates
         max_fp (int): max numb. of aneurysms retained
         dark_fp_threshold (float): threshold used to remove predictions which are on average too dark for being a true aneurysm
-    Returns:
-        None
     """
     # save resampled probabilistic segmentation mask to disk
     out_filename = "result.nii.gz"  # type: str # define filename of predicted binary segmentation volume
@@ -1004,30 +1156,56 @@ def save_output_mask_and_output_location(segm_map_resampled, output_folder_path_
     save_volume_mask_to_disk(segm_map, output_folder_path_, segm_map_nib_obj.affine, out_filename_probabilistic, output_dtype="float32")
 
     # create output txt file with probabilistic segmentation mask in original (i.e. non-resampled) space
-    segm_map_binary, avg_brightness_predicted_aneurysms, mapping_centers_masks = create_txt_output_file_and_remove_dark_fp(os.path.join(output_folder_path_, out_filename_probabilistic),
-                                                                                                                           txt_file_path,
-                                                                                                                           original_bet_bfc_angio,
-                                                                                                                           remove_dark_fp,
-                                                                                                                           dark_fp_threshold)
+    segm_map_binary, mapping_centers_avg_brightness, mapping_centers_nonzero_coords,\
+        second_txt_path, mapping_centers_count_nonzero_voxels = create_txt_output_file_and_remove_dark_fp(os.path.join(output_folder_path_, out_filename_probabilistic),
+                                                                                                          txt_file_path,
+                                                                                                          original_bet_bfc_angio,
+                                                                                                          remove_dark_fp,
+                                                                                                          dark_fp_threshold)
 
     # make sure mask is binary
-    assert np.array_equal(segm_map_binary, segm_map_binary.astype(bool)), "WATCH OUT: mask is not binary in original space"
+    assert is_binary(segm_map_binary), "WATCH OUT: mask is not binary in original space"
 
     # save binary output mask, OVERWRITING previous probabilistic one
     save_volume_mask_to_disk(segm_map_binary, output_folder_path_, segm_map_nib_obj.affine, out_filename, output_dtype="int32")
 
-    # also remove dark FP from segmentation map
+    # also remove dark FP from segmentation map (before we had only removed them from result.txt)
     if remove_dark_fp:
-        reduce_fp_in_segm_map(txt_file_path, output_folder_path_, out_filename, mapping_centers_masks)
+        reduce_fp_in_segm_map(txt_file_path, output_folder_path_, out_filename, mapping_centers_nonzero_coords)
 
+    # reduce FPs to a maximum of max_fp, only retaining the most probable (i.e. those that have highest average brightness)
     if reduce_fp:
-        # reduce FPs to a maximum of max_fp, only retaining the most probable patch centers
-        reduce_false_positives(txt_file_path, avg_brightness_predicted_aneurysms, max_fp, output_folder_path_, out_filename, mapping_centers_masks)
+        reduce_false_positives(txt_file_path,
+                               mapping_centers_avg_brightness,
+                               max_fp,
+                               output_folder_path_,
+                               out_filename,
+                               mapping_centers_nonzero_coords,
+                               second_txt_path,
+                               mapping_centers_count_nonzero_voxels)
 
 
-def create_output_folder(batched_ds, output_folder_path_, unet_threshold, unet, resampled_nii_volume_after_bet,
-                         reduce_fp_with_volume, min_aneurysm_volume, nii_volume_obj_after_bet_resampled, patch_center_coords, shift_scale_1, orig_bfc_angio_sitk,
-                         aff_mat_resampled, tmp_path, reduce_fp, max_fp, remove_dark_fp, dark_fp_threshold, original_bet_bfc_angio, sub_ses, test_time_augmentation, unet_batch_size):
+def create_output_folder(batched_ds,
+                         output_folder_path_,
+                         unet_threshold,
+                         unet,
+                         resampled_nii_volume_after_bet,
+                         reduce_fp_with_volume,
+                         min_aneurysm_volume,
+                         nii_volume_obj_after_bet_resampled,
+                         patch_center_coords,
+                         shift_scale_1,
+                         orig_bfc_angio_sitk,
+                         aff_mat_resampled,
+                         tmp_path,
+                         reduce_fp,
+                         max_fp,
+                         remove_dark_fp,
+                         dark_fp_threshold,
+                         original_bet_bfc_angio,
+                         sub_ses,
+                         test_time_augmentation,
+                         unet_batch_size):
     """This function creates the output file "result.txt" containing the voxel coordinates of the center of the predicted aneurysm(s);
     also, it creates the output file result.nii.gz which is the predicted segmentation mask for the subject being analyzed.
     Args:
@@ -1101,12 +1279,12 @@ def create_output_folder(batched_ds, output_folder_path_, unet_threshold, unet, 
                     # impose a minimum threshold for the aneurysm volume in mm^3. This threshold is the 5th percentile of training ADAM masks' volumes
                     if aneur_volume > min_aneurysm_volume:
                         center_tof_space = patch_center_coords[index]  # find corresponding patch center in TOF space
-                        segm_map_resampled[center_tof_space[0]-shift_scale_1:center_tof_space[0]+shift_scale_1,
-                                           center_tof_space[1]-shift_scale_1:center_tof_space[1]+shift_scale_1,
-                                           center_tof_space[2]-shift_scale_1:center_tof_space[2]+shift_scale_1] += probabilistic_largest_conn_comp
-                        overlap_map_resampled[center_tof_space[0]-shift_scale_1:center_tof_space[0]+shift_scale_1,
-                                              center_tof_space[1]-shift_scale_1:center_tof_space[1]+shift_scale_1,
-                                              center_tof_space[2]-shift_scale_1:center_tof_space[2]+shift_scale_1] += binary_largest_conn_comp
+                        segm_map_resampled[center_tof_space[0] - shift_scale_1:center_tof_space[0] + shift_scale_1,
+                                           center_tof_space[1] - shift_scale_1:center_tof_space[1] + shift_scale_1,
+                                           center_tof_space[2] - shift_scale_1:center_tof_space[2] + shift_scale_1] += probabilistic_largest_conn_comp
+                        overlap_map_resampled[center_tof_space[0] - shift_scale_1:center_tof_space[0] + shift_scale_1,
+                                              center_tof_space[1] - shift_scale_1:center_tof_space[1] + shift_scale_1,
+                                              center_tof_space[2] - shift_scale_1:center_tof_space[2] + shift_scale_1] += binary_largest_conn_comp
 
             # if we don't apply a FP reduction by volume
             else:
@@ -1144,13 +1322,14 @@ def create_output_folder(batched_ds, output_folder_path_, unet_threshold, unet, 
         raise ValueError("Unexpected value for len(patch_center_coords): {}".format(len(patch_center_coords)))
 
 
-def check_registration_quality(quality_metrics_thresholds, sub_quality_metrics):
+def check_registration_quality(quality_metrics_thresholds: tuple,
+                               sub_quality_metrics: tuple) -> bool:
     """This function checks whether the registration was correct or not for the subject being evaluated.
     Args:
-        quality_metrics_thresholds (tuple): registration quality metrics; specifically, it contains (p3_neigh_corr_struct_2_tof, p97_mut_inf_struct_2_tof)
-        sub_quality_metrics (tuple): it contains the registration quality metrics for the subject being evaluated; specifically, (struct_2_tof_nc, struct_2_tof_mi)
+        quality_metrics_thresholds: registration quality metrics; specifically, it contains (p3_neigh_corr_struct_2_tof, p97_mut_inf_struct_2_tof)
+        sub_quality_metrics: it contains the registration quality metrics for the subject being evaluated; specifically, (struct_2_tof_nc, struct_2_tof_mi)
     Returns:
-        registration_accurate_enough (bool): it indicates whether the registration accuracy is high enough to perform the anatomically-informed sliding window
+        registration_accurate_enough: it indicates whether the registration accuracy is high enough to perform the anatomically-informed sliding window
     """
     registration_accurate_enough = False
 
@@ -1161,7 +1340,7 @@ def check_registration_quality(quality_metrics_thresholds, sub_quality_metrics):
     return registration_accurate_enough
 
 
-def get_result_filename_coord_file(dirname):
+def get_result_filename_coord_file(dirname: str) -> str:
     """Find the filename of the result coordinate file.
 
     This should be result.txt If this file is not present,
@@ -1239,7 +1418,9 @@ def get_treated_locations(test_image):
     return np.array(list(zip(*treated_coords)))
 
 
-def get_detection_metrics(test_locations, result_locations, test_image):
+def get_detection_metrics(test_locations,
+                          result_locations,
+                          test_image):
     """Calculate sensitivity and false positive count for each image.
 
     The distance between every result-location and test-locations must be less
@@ -1294,7 +1475,8 @@ def get_detection_metrics(test_locations, result_locations, test_image):
     return sensitivity, false_positives
 
 
-def get_images(test_filename, result_filename):
+def get_images(test_filename,
+               result_filename):
     """Return the test and result images, thresholded and treated aneurysms removed."""
     test_image = sitk.ReadImage(test_filename)
     result_image = sitk.ReadImage(result_filename)
@@ -1332,7 +1514,8 @@ def get_result_filename_volume(dirname):
     return os.path.join(dirname, result_filename)
 
 
-def get_dsc(test_image, result_image):
+def get_dsc(test_image,
+            result_image):
     """Compute the Dice Similarity Coefficient."""
     test_array = sitk.GetArrayFromImage(test_image).flatten()
     result_array = sitk.GetArrayFromImage(result_image).flatten()
@@ -1351,7 +1534,8 @@ def get_dsc(test_image, result_image):
         return 1.0 - scipy.spatial.distance.dice(test_array, result_array)
 
 
-def get_hausdorff(test_image, result_image):
+def get_hausdorff(test_image,
+                  result_image):
     """Compute the Hausdorff distance."""
 
     def get_distances_from_a_to_b(a, b):
@@ -1399,7 +1583,8 @@ def get_hausdorff(test_image, result_image):
     return hd
 
 
-def get_vs(test_image, result_image):
+def get_vs(test_image,
+           result_image):
     """Volumetric Similarity.
 
     VS = 1 -abs(A-B)/(A+B)
@@ -1425,15 +1610,18 @@ def get_vs(test_image, result_image):
     return vs
 
 
-def compute_patient_wise_metrics(out_dir, ground_truth_dir, sub, ses):
+def compute_patient_wise_metrics(out_dir: str,
+                                 ground_truth_dir: str,
+                                 sub: str,
+                                 ses: str) -> pd.DataFrame:
     """This function computes detection and segmentation metrics for one subject with the scripts of the ADAM challenge
     Args:
-        out_dir (str): path to folder where the output files of this subject are stored
-        ground_truth_dir (str): path to folder containing ground truth segmentation volume and location file of this subject
-        sub (str): ipp of subject being evaluated
-        ses (str): session of subject being evaluated (i.e. exam date)
+        out_dir: path to folder where the output files of this subject are stored
+        ground_truth_dir: path to folder containing ground truth segmentation volume and location file of this subject
+        sub: ipp of subject being evaluated
+        ses: session of subject being evaluated (i.e. exam date)
     Returns:
-        out_metrics (pd.Dataframe): it contains detection and segmentation metrics in the order (sensitivity, FP rate, DSC, HD95, VS)
+        out_metrics: it contains detection and segmentation metrics in the order (sensitivity, FP rate, DSC, HD95, VS)
     """
     # --------------- DETECTION ---------------
     result_filename_coord_file = get_result_filename_coord_file(out_dir)
@@ -1456,12 +1644,14 @@ def compute_patient_wise_metrics(out_dir, ground_truth_dir, sub, ses):
     return out_metrics
 
 
-def save_and_print_results(metrics_cv_fold, inference_outputs_path, out_date):
+def save_and_print_results(metrics_cv_fold: list,
+                           inference_outputs_path: str,
+                           out_date: str) -> None:
     """This function saves output results to disk and prints them.
     Args:
-        metrics_cv_fold (list): it contains the output metrics of all the subjects for each fold
-        inference_outputs_path (str): path to folder where we save all the outputs of the patient-wise analysis
-        out_date (str): today's date
+        metrics_cv_fold: it contains the output metrics of all the subjects for each fold
+        inference_outputs_path: path to folder where we save all the outputs of the patient-wise analysis
+        out_date: today's date
     """
     # create unique dataframe with the metrics of all subjects
     out_metrics_df = pd.concat(metrics_cv_fold)
@@ -1480,15 +1670,20 @@ def save_and_print_results(metrics_cv_fold, inference_outputs_path, out_date):
     print("Average VS: {:.3f}".format(out_metrics_df["VS"].mean()))
 
 
-def convert_mni_to_angio(df_landmarks, bfc_angio_volume_sitk, tmp_path, mni_2_struct_mat_path, struct_2_tof_mat_path, mni_2_struct_inverse_warp_path):
+def convert_mni_to_angio(df_landmarks: pd.DataFrame,
+                         bfc_angio_volume_sitk: sitk.Image,
+                         tmp_path: str,
+                         mni_2_struct_mat_path: str,
+                         struct_2_tof_mat_path: str,
+                         mni_2_struct_inverse_warp_path: str) -> pd.DataFrame:
     """This function registers the landmark points to subject space (i.e. angio-TOF space)
     Args:
-        df_landmarks (pd.Dataframe): it contains the 3D coordinates of the MNI landmark points in mm
-        bfc_angio_volume_sitk (sitk.Image): original bfc tof volume loaded with sitk; used for debugging
-        tmp_path (str): path to folder where we save temporary registration files
-        mni_2_struct_mat_path (str): path to MNI_2_struct .mat file
-        struct_2_tof_mat_path (str): path to struct_2_TOF .mat file
-        mni_2_struct_inverse_warp_path (str): path to mni_2_struct inverse warp field
+        df_landmarks: it contains the 3D coordinates of the MNI landmark points in mm
+        bfc_angio_volume_sitk: original bfc tof volume loaded with sitk; used for debugging
+        tmp_path: path to folder where we save temporary registration files
+        mni_2_struct_mat_path: path to MNI_2_struct .mat file
+        struct_2_tof_mat_path: path to struct_2_TOF .mat file
+        mni_2_struct_inverse_warp_path: path to mni_2_struct inverse warp field
     Returns:
         df_landmark_points_tof_space (pd.Dataframe): it contains the physical (mm) coordinates of the landmark points warped to tof space
     """
@@ -1557,18 +1752,24 @@ def convert_mni_to_angio(df_landmarks, bfc_angio_volume_sitk, tmp_path, mni_2_st
     return df_landmark_points_tof_space
 
 
-def extract_distance_one_aneurysm(subdir, aneur_path, bids_path, overlapping, patch_side, landmarks_physical_space_path, out_dir):
+def extract_distance_one_aneurysm(subdir: str,
+                                  aneur_path: str,
+                                  bids_path: str,
+                                  overlapping: float,
+                                  patch_side: int,
+                                  landmarks_physical_space_path: str,
+                                  out_dir: str) -> Any:
     """This function computes the distances from the positive patches (with aneurysm) of one patient to the landmark points where aneurysm occurrence is most frequent
     Args:
-        subdir (str): parent directory to aneurysm nifti file
-        aneur_path (str): filename of aneurysm nifti file
-        bids_path (str): path to BIDS dataset
-        overlapping (float): amount of overlapping between patches in sliding-window approach
-        patch_side (int): side of cubic patches
-        landmarks_physical_space_path (str): path to file containing the landmark points in MNI physical space
-        out_dir (str): path to folder where output files will be saved
+        subdir: parent directory to aneurysm nifti file
+        aneur_path: filename of aneurysm nifti file
+        bids_path: path to BIDS dataset
+        overlapping: amount of overlapping between patches in sliding-window approach
+        patch_side: side of cubic patches
+        landmarks_physical_space_path: path to file containing the landmark points in MNI physical space
+        out_dir: path to folder where output files will be saved
     Returns:
-        min_and_mean_distances (list): it contains the min and mean distances from the positive patches to the landmark points for one patient
+        min_and_mean_distances: it contains the min and mean distances from the positive patches to the landmark points for one patient
     """
     shift_scale_1 = patch_side // 2
     sub = re.findall(r"sub-\d+", subdir)[0]
@@ -1678,7 +1879,14 @@ def extract_distance_one_aneurysm(subdir, aneur_path, bids_path, overlapping, pa
         return None  # in any case the Nones will be removed later
 
 
-def extract_distance_thresholds(bids_ds_path, reg_quality_metrics_threshold, sub_ses_test, n_parallel_jobs, overlapping, patch_side, landmarks_physical_space_path, out_dir):
+def extract_distance_thresholds(bids_ds_path,
+                                reg_quality_metrics_threshold,
+                                sub_ses_test,
+                                n_parallel_jobs,
+                                overlapping,
+                                patch_side,
+                                landmarks_physical_space_path,
+                                out_dir):
     """This function computes the distances from the true aneurysms of the train input dataset to the landmark points where aneurysm occurrence is most frequent.
     From the distribution of these distances, it extracts the min and the mean value which will be used in the sliding-window to extract anatomically-plausible
     patches (i.e. patches which are "not-too-far" from the landmark points).
@@ -1739,7 +1947,9 @@ def extract_distance_thresholds(bids_ds_path, reg_quality_metrics_threshold, sub
     return distances_thresholds
 
 
-def extract_dark_fp_threshold_one_aneurysm(subdir, aneur_path, bids_dir):
+def extract_dark_fp_threshold_one_aneurysm(subdir,
+                                           aneur_path,
+                                           bids_dir):
     """This function computes the intensity ratio of one aneurysm
     Args:
         subdir (str): parent directory to aneurysm nifti file
@@ -1784,13 +1994,15 @@ def extract_dark_fp_threshold_one_aneurysm(subdir, aneur_path, bids_dir):
     return intensity_ratio
 
 
-def extract_dark_fp_threshold(bids_dir, sub_ses_test, nb_parallel_jobs):
+def extract_dark_fp_threshold(bids_dir: str,
+                              sub_ses_test: list,
+                              nb_parallel_jobs: int) -> float:
     """This function computes the threshold that we use to discard false positive predictions which are too dark. If a prediction is correct,
     it is usually bright because aneurysms tend to be bright.
     Args:
-        bids_dir (str): path to BIDS dataset
-        sub_ses_test (list): sub_ses of the test set; we use it to take only the sub_ses of the training set
-        nb_parallel_jobs (int): number of jobs to run in parallel with joblib
+        bids_dir: path to BIDS dataset
+        sub_ses_test: sub_ses of the test set; we use it to take only the sub_ses of the training set
+        nb_parallel_jobs: number of jobs to run in parallel with joblib
     Returns:
         dark_fp_threshold (float): desired threshold
     """
@@ -1892,7 +2104,7 @@ def extract_thresholds_for_anatomically_informed(bids_dir,
     return reg_quality_metrics_threshold, intensity_thresholds, distances_thresholds, dark_fp_threshold
 
 
-def load_file_from_disk(file_path: str):
+def load_file_from_disk(file_path: str) -> str:
     """This function loads a file from disk and returns it
     Args:
         file_path (str): path to file
@@ -1906,16 +2118,21 @@ def load_file_from_disk(file_path: str):
     return sub_ses_test
 
 
-def save_sliding_window_mask_to_disk(sliding_window_mask_volume, aff_mat_resampled, output_folder_path_, orig_bfc_angio_sitk, tmp_path, out_filename="mask_sliding_window.nii.gz"):
+def save_sliding_window_mask_to_disk(sliding_window_mask_volume: np.ndarray,
+                                     aff_mat_resampled: np.ndarray,
+                                     output_folder_path_: str,
+                                     orig_bfc_angio_sitk: sitk.Image,
+                                     tmp_path: str,
+                                     out_filename: str = "mask_sliding_window.nii.gz") -> None:
     """This function saves the sliding-window mask to disk; this serves just for visual purposes. We want to check which are the patches that were
     retained during inference and see if they make sense from a radiological point of view
     Args:
-        sliding_window_mask_volume (np.ndarray): resampled volume to save to disk; will be first brought back to original space and then saved
-        aff_mat_resampled (np.ndarray): affine matrix of resampled space
-        output_folder_path_ (str): path to output folder
-        orig_bfc_angio_sitk (sitk.Image): sitk volume of the bias-field-corrected, non-resampled angio
-        tmp_path (str): path where we save temporary files
-        out_filename (str): filename of output file
+        sliding_window_mask_volume: resampled volume to save to disk; will be first brought back to original space and then saved
+        aff_mat_resampled: affine matrix of resampled space
+        output_folder_path_: path to output folder
+        orig_bfc_angio_sitk: sitk volume of the bias-field-corrected, non-resampled angio
+        tmp_path: path where we save temporary files
+        out_filename: filename of output file
     """
     # save resampled sliding window mask
     save_volume_mask_to_disk(sliding_window_mask_volume, output_folder_path_, aff_mat_resampled, out_filename, output_dtype="int32")
@@ -1937,15 +2154,15 @@ def save_sliding_window_mask_to_disk(sliding_window_mask_volume, aff_mat_resampl
     save_volume_mask_to_disk(resampled_sliding_window_mask_volume, output_folder_path_, resampled_sliding_window_mask_volume_obj.affine, out_filename, output_dtype="int32")
 
 
-def check_output_consistency_between_detection_and_segmentation(output_folder, sub, ses):
+def check_output_consistency_between_detection_and_segmentation(output_folder: str,
+                                                                sub: str,
+                                                                ses: str) -> None:
     """This function checks that the output files (txt and .nii.gz) correspond. In other words, if the txt file contains 3 aneurysms,
     the corresponding binary mask should have 3 connected components.
     Args:
-        output_folder (str): path to dir containing result files
-        sub (str): subject being analyzed
-        ses (str): session (i.e. exam date)
-    Returns:
-        None
+        output_folder: path to dir containing result files
+        sub: subject being analyzed
+        ses: session (i.e. exam date)
     Raises:
         AssertionError: if there is a mismatch between the two files
     """
@@ -1966,9 +2183,24 @@ def check_output_consistency_between_detection_and_segmentation(output_folder, s
             print("\nWARNING for {}_{}: there shouldn't be any connected component; found {} instead".format(sub, ses, numb_labels))
 
 
-def sanity_check_inputs(unet_patch_side, unet_batch_size, unet_threshold, overlapping, new_spacing, conv_filters, cv_folds, anatomically_informed_sliding_window,
-                        test_time_augmentation, reduce_fp, max_fp, reduce_fp_with_volume, min_aneurysm_volume, remove_dark_fp, bids_dir, training_outputs_path,
-                        landmarks_physical_space_path, ground_truth_dir):
+def sanity_check_inputs(unet_patch_side,
+                        unet_batch_size,
+                        unet_threshold,
+                        overlapping,
+                        new_spacing,
+                        conv_filters,
+                        cv_folds,
+                        anatomically_informed_sliding_window,
+                        test_time_augmentation,
+                        reduce_fp,
+                        max_fp,
+                        reduce_fp_with_volume,
+                        min_aneurysm_volume,
+                        remove_dark_fp,
+                        bids_dir,
+                        training_outputs_path,
+                        landmarks_physical_space_path,
+                        ground_truth_dir) -> None:
     """This function runs some sanity checks on the inputs of the sliding-window.
     Args:
         unet_patch_side (int): patch side of cubic patches
@@ -1976,7 +2208,7 @@ def sanity_check_inputs(unet_patch_side, unet_batch_size, unet_threshold, overla
         unet_threshold (float): # threshold used to binarize the probabilistic U-Net's prediction
         overlapping (float): rate of overlapping to use during the sliding-window; defaults to 0
         new_spacing (list): it contains the desired voxel spacing to which we will resample
-        conv_filters (list): it contains the number of filters in the convolutional layers
+        conv_filters (tuple): it contains the number of filters in the convolutional layers
         cv_folds (int): number of cross-validation folds
         anatomically_informed_sliding_window (bool): whether to perform the anatomically-informed sliding-window
         test_time_augmentation (bool): whether to perform test time augmentation
@@ -1989,8 +2221,6 @@ def sanity_check_inputs(unet_patch_side, unet_batch_size, unet_threshold, overla
         training_outputs_path (str): path to folder where we stored the weights of the network at the end of training
         landmarks_physical_space_path (str): path to file containing the coordinates of the landmark points
         ground_truth_dir (str): path to directory containing the ground truth masks and location files
-    Returns:
-        None
     """
     assert isinstance(unet_patch_side, int), "Patch side must be of type int; got {} instead".format(type(unet_patch_side))
     assert unet_patch_side > 0, "Patch side must be > 0; got {} instead".format(unet_patch_side)
@@ -2002,7 +2232,7 @@ def sanity_check_inputs(unet_patch_side, unet_batch_size, unet_threshold, overla
     assert 0 < overlapping < 1, "Overlapping must be in the range (0,1)"
     assert isinstance(new_spacing, list), "new_spacing must be of type list; got {} instead".format(type(new_spacing))
     assert all(isinstance(x, float) for x in new_spacing), "All elements inside new_spacing list must be of type float"
-    assert isinstance(conv_filters, list), "conv_filters must be of type list; got {} instead".format(type(conv_filters))
+    assert isinstance(conv_filters, tuple), "conv_filters must be of type tuple; got {} instead".format(type(conv_filters))
     assert all(isinstance(x, int) for x in conv_filters), "All elements inside conv_filters list must be of type int"
     assert isinstance(cv_folds, int), "cv_folds must be of type int; got {} instead".format(type(cv_folds))
     assert cv_folds > 0, "cv_folds must be > 0"
@@ -2047,7 +2277,13 @@ def get_parser():
     return p
 
 
-def invert_augmentations(augm_patch_hor_flip, augm_patch_ver_flip, augm_patch_270_rot, augm_patch_180_rot, augm_patch_90_rot, idx, aff_mat_resampled):
+def invert_augmentations(augm_patch_hor_flip,
+                         augm_patch_ver_flip,
+                         augm_patch_270_rot,
+                         augm_patch_180_rot,
+                         augm_patch_90_rot,
+                         idx,
+                         aff_mat_resampled):
     """This function inverts the data augmentation in order to go back to the orientation of the original patch (i.e. the non-augmented one)
     Args:
         augm_patch_hor_flip (EagerTensor): patch augmented with horizontal flipping
@@ -2178,8 +2414,19 @@ def apply_augmentations(patch):
             augm_patch_90_rot, augm_patch_adj_contr, augm_patch_gamma_corr, augm_patch_gauss_noise
 
 
-def predict_augmented_patches(patch, augm_patch_hor_flip, augm_patch_ver_flip, augm_patch_270_rot, augm_patch_180_rot,
-                              augm_patch_90_rot, augm_patch_adj_contr, augm_patch_gamma_corr, augm_patch_gauss_noise, unet, unet_batch_size, idx, aff_mat_resampled):
+def predict_augmented_patches(patch,
+                              augm_patch_hor_flip,
+                              augm_patch_ver_flip,
+                              augm_patch_270_rot,
+                              augm_patch_180_rot,
+                              augm_patch_90_rot,
+                              augm_patch_adj_contr,
+                              augm_patch_gamma_corr,
+                              augm_patch_gauss_noise,
+                              unet,
+                              unet_batch_size,
+                              idx,
+                              aff_mat_resampled):
     """This function computes the predictions for the augmented patches
     Args:
         patch (EagerTensor): original patch
@@ -2322,10 +2569,10 @@ def compute_test_time_augmentation(batched_dataset, unet, unet_batch_size, aff_m
     return tta_pred_patches
 
 
-def load_config_file():
+def load_config_file() -> dict:
     """This function loads the input config file
     Returns:
-        config_dictionary (dict): it contains the input arguments
+        config_dictionary: it contains the input arguments
     """
     parser = get_parser()  # create parser
     args = parser.parse_args()  # convert argument strings to objects
@@ -2333,3 +2580,16 @@ def load_config_file():
         config_dictionary = json.load(f)
 
     return config_dictionary
+
+
+def is_binary(input_array: np.ndarray) -> bool:
+    """This function checks whether the input array is binary (i.e. contains only 0s and 1s).
+    If yes, it returns True, otherwise it returns False.
+    Args:
+        input_array: input array that we want to inspect
+    Returns:
+        array_is_binary: True if input_array is binary; False otherwise
+    """
+    array_is_binary = np.array_equal(input_array, input_array.astype(bool))
+
+    return array_is_binary
