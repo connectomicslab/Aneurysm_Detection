@@ -2500,15 +2500,18 @@ def predict_augmented_patches(patch,
            pred_augm_patch_90_rot, pred_augm_patch_adj_contr, pred_augm_patch_gamma_corr, pred_augm_patch_gauss_noise
 
 
-def compute_test_time_augmentation(batched_dataset, unet, unet_batch_size, aff_mat_resampled):
+def compute_test_time_augmentation(batched_dataset: tf.data.Dataset,
+                                   unet: tf.keras.Model,
+                                   unet_batch_size: int,
+                                   aff_mat_resampled: np.ndarray) -> np.ndarray:
     """This function performs test time data augmentation on the retained patches of the sliding-window approach
     Args:
-        batched_dataset (tf.data.Dataset): input dataset to augment
-        unet (tf.keras.Model): trained network with which we perform inference
-        unet_batch_size (int): batch size. Not really relevant (cause we're doing inference), but still needed
-        aff_mat_resampled (np.ndarray): affine matrix of the resampled volume
+        batched_dataset: input dataset to augment
+        unet: trained network with which we perform inference
+        unet_batch_size: batch size. Not really relevant (cause we're doing inference), but still needed
+        aff_mat_resampled: affine matrix of the resampled volume
     Returns:
-        tta_pred_patches (np.ndarray): average predictions (across augmentations) for all the retained patches of the sliding-window
+        tta_pred_patches: average predictions (across augmentations) for all the retained patches of the sliding-window
     """
     unbatched_dataset = batched_dataset.unbatch()  # unbatch dataset because we want to loop over every single retained patch
 
