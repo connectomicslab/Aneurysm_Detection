@@ -88,18 +88,20 @@ def extract_registration_quality_metrics(bids_ds_path: str,
     all_struct_2_tof_neigh_corr = []
     all_struct_2_tof_mutual_inf = []
     for sub in os.listdir(os.path.join(reg_metrics_dir)):
-        for ses in os.listdir(os.path.join(reg_metrics_dir, sub)):
-            sub_ses = "{}_{}".format(sub, ses)
-            if sub_ses not in sub_ses_test:  # only use training ones otherwise we might introduce a bias towards the registration quality metrics of the test set
-                for files in os.listdir(os.path.join(reg_metrics_dir, sub, ses)):
-                    if "mni2struct" in files:
-                        pass
-                    elif "struct2tof" in files:
-                        struct_2_tof_metrics = pd.read_csv(os.path.join(reg_metrics_dir, sub, ses, files))
-                        all_struct_2_tof_neigh_corr.append(struct_2_tof_metrics.iloc[0]['neigh_corr'])
-                        all_struct_2_tof_mutual_inf.append(struct_2_tof_metrics.iloc[0]['mut_inf'])
-                    else:
-                        raise ValueError("Unknown filename")
+        if "sub" in sub and os.path.isdir(os.path.join(reg_metrics_dir, sub)):
+            for ses in os.listdir(os.path.join(reg_metrics_dir, sub)):
+                if "ses" in ses and os.path.isdir(os.path.join(reg_metrics_dir, sub, ses)):
+                    sub_ses = "{}_{}".format(sub, ses)
+                    if sub_ses not in sub_ses_test:  # only use training ones otherwise we might introduce a bias towards the registration quality metrics of the test set
+                        for files in os.listdir(os.path.join(reg_metrics_dir, sub, ses)):
+                            if "mni2struct" in files:
+                                pass
+                            elif "struct2tof" in files:
+                                struct_2_tof_metrics = pd.read_csv(os.path.join(reg_metrics_dir, sub, ses, files))
+                                all_struct_2_tof_neigh_corr.append(struct_2_tof_metrics.iloc[0]['neigh_corr'])
+                                all_struct_2_tof_mutual_inf.append(struct_2_tof_metrics.iloc[0]['mut_inf'])
+                            else:
+                                raise ValueError("Unknown filename")
 
     p3_neigh_corr_struct_2_tof = np.percentile(all_struct_2_tof_neigh_corr, [3])[0]
     p97_mut_inf_struct_2_tof = np.percentile(all_struct_2_tof_mutual_inf, [97])[0]
@@ -1109,30 +1111,30 @@ def reduce_false_positives(txt_file_path: str,
             reduce_fp_in_segm_map(txt_file_path, output_folder_path, out_filename, mapping_centers_nonzero_coords)
 
 
-def save_output_mask_and_output_location(segm_map_resampled,
-                                         output_folder_path_,
-                                         aff_mat_resampled,
-                                         orig_bfc_angio_sitk,
-                                         tmp_path,
-                                         txt_file_path,
-                                         original_bet_bfc_angio,
-                                         remove_dark_fp,
-                                         reduce_fp,
-                                         max_fp,
-                                         dark_fp_threshold) -> None:
+def save_output_mask_and_output_location(segm_map_resampled: np.ndarray,
+                                         output_folder_path_: str,
+                                         aff_mat_resampled: np.ndarray,
+                                         orig_bfc_angio_sitk: sitk.Image,
+                                         tmp_path: str,
+                                         txt_file_path: str,
+                                         original_bet_bfc_angio: np.ndarray,
+                                         remove_dark_fp: bool,
+                                         reduce_fp: bool,
+                                         max_fp: int,
+                                         dark_fp_threshold: float) -> None:
     """This function saves the output mask (resampled back to original space) to disk. Plus, it also saves the corresponding location file (with the candidate aneurysm(s) center(s))
     Args:
-        segm_map_resampled (np.ndarray): resampled segmentation map to save
-        output_folder_path_ (str): folder path where we'll save the output file
-        aff_mat_resampled (np.ndarray): affine matrix of resampled space
-        orig_bfc_angio_sitk (sitk.Image): sitk volume of the bias-field-corrected, non-resampled angio
-        tmp_path (str): path where we save temporary files
-        txt_file_path (str): path to txt file containing the aneurysm(s) center location(s)
-        original_bet_bfc_angio (np.ndarray): bias-field-corrected angio volume after BET before resampling
-        remove_dark_fp (bool): if set to True, candidate aneurysms that are not brighter than a certain threshold (on average) are discarded
-        reduce_fp (bool): if set to true, we only retain the "max_fp" most probable aneurysm candidates
-        max_fp (int): max numb. of aneurysms retained
-        dark_fp_threshold (float): threshold used to remove predictions which are on average too dark for being a true aneurysm
+        segm_map_resampled: resampled segmentation map to save
+        output_folder_path_: folder path where we'll save the output file
+        aff_mat_resampled: affine matrix of resampled space
+        orig_bfc_angio_sitk: sitk volume of the bias-field-corrected, non-resampled angio
+        tmp_path: path where we save temporary files
+        txt_file_path: path to txt file containing the aneurysm(s) center location(s)
+        original_bet_bfc_angio: bias-field-corrected angio volume after BET before resampling
+        remove_dark_fp: if set to True, candidate aneurysms that are not brighter than a certain threshold (on average) are discarded
+        reduce_fp: if set to true, we only retain the "max_fp" most probable aneurysm candidates
+        max_fp: max numb. of aneurysms retained
+        dark_fp_threshold: threshold used to remove predictions which are on average too dark for being a true aneurysm
     """
     # save resampled probabilistic segmentation mask to disk
     out_filename = "result.nii.gz"  # type: str # define filename of predicted binary segmentation volume
@@ -1185,51 +1187,51 @@ def save_output_mask_and_output_location(segm_map_resampled,
                                mapping_centers_count_nonzero_voxels)
 
 
-def create_output_folder(batched_ds,
-                         output_folder_path_,
-                         unet_threshold,
-                         unet,
-                         resampled_nii_volume_after_bet,
-                         reduce_fp_with_volume,
-                         min_aneurysm_volume,
-                         nii_volume_obj_after_bet_resampled,
-                         patch_center_coords,
-                         shift_scale_1,
-                         orig_bfc_angio_sitk,
-                         aff_mat_resampled,
-                         tmp_path,
-                         reduce_fp,
-                         max_fp,
-                         remove_dark_fp,
-                         dark_fp_threshold,
-                         original_bet_bfc_angio,
-                         sub_ses,
-                         test_time_augmentation,
-                         unet_batch_size):
+def create_output_folder(batched_ds: tf.data.Dataset,
+                         output_folder_path_: str,
+                         unet_threshold: float,
+                         unet: tf.keras.Model,
+                         resampled_nii_volume_after_bet: np.ndarray,
+                         reduce_fp_with_volume: bool,
+                         min_aneurysm_volume: float,
+                         nii_volume_obj_after_bet_resampled: nib.Nifti1Image,
+                         patch_center_coords: list,
+                         shift_scale_1: int,
+                         orig_bfc_angio_sitk: sitk.Image,
+                         aff_mat_resampled: np.ndarray,
+                         tmp_path: str,
+                         reduce_fp: bool,
+                         max_fp: int,
+                         remove_dark_fp: bool,
+                         dark_fp_threshold: float,
+                         original_bet_bfc_angio: np.ndarray,
+                         sub_ses: str,
+                         test_time_augmentation: bool,
+                         unet_batch_size: int) -> None:
     """This function creates the output file "result.txt" containing the voxel coordinates of the center of the predicted aneurysm(s);
     also, it creates the output file result.nii.gz which is the predicted segmentation mask for the subject being analyzed.
     Args:
-        batched_ds (tf.data.Dataset): dataset to evaluate
-        output_folder_path_ (str): folder path where we'll save the output file
-        unet_threshold (float): threshold used for obtaining binary volume from the probabilistic output of the UNet
-        unet (tf.keras.Model): trained network that we use for inference
-        resampled_nii_volume_after_bet (np.ndarray): resampled bias-field-corrected angio volume after BET
-        reduce_fp_with_volume (bool): if set to True, only the candidate lesions that have a volume (mm^3) > than a specific threshold are retained
-        min_aneurysm_volume (float): minimum aneurysm volume; if the model predicts an aneurysm with volume smaller than this, this prediction is removed
-        nii_volume_obj_after_bet_resampled ((Nifti1Image): nibabel object of the resampled bias-field-corrected BET angio volume
-        patch_center_coords (list): it contains the center coordinates of the retained patches (i.e. patches that fulfilled the extraction criteria)
-        shift_scale_1 (int): half patch side
-        orig_bfc_angio_sitk (sitk.Image): sitk volume of the bias-field-corrected, non-resampled angio
-        aff_mat_resampled (np.ndarray): affine matrix of resampled space
-        tmp_path (str): path where we save temporary files
-        reduce_fp (bool): if set to true, we only retain the "max_fp" most probable aneurysm candidates
-        max_fp (int): max numb. of aneurysms retained
-        remove_dark_fp (bool): if set to True, candidate aneurysms that are not brighter than a certain threshold (on average) are discarded
-        dark_fp_threshold (float): threshold used to remove predictions which are on average too dark for being a true aneurysm
-        original_bet_bfc_angio (np.ndarray): bias-field-corrected angio volume after BET before resampling
-        sub_ses (str): subject id and session id
-        test_time_augmentation (bool): whether to perform test-time augmentation
-        unet_batch_size (int): batch size. Not really relevant (cause we're doing inference), but still needed
+        batched_ds: dataset to evaluate
+        output_folder_path_: folder path where we'll save the output file
+        unet_threshold: threshold used for obtaining binary volume from the probabilistic output of the UNet
+        unet: trained network that we use for inference
+        resampled_nii_volume_after_bet: resampled bias-field-corrected angio volume after BET
+        reduce_fp_with_volume: if set to True, only the candidate lesions that have a volume (mm^3) > than a specific threshold are retained
+        min_aneurysm_volume: minimum aneurysm volume; if the model predicts an aneurysm with volume smaller than this, this prediction is removed
+        nii_volume_obj_after_bet_resampled: nibabel object of the resampled bias-field-corrected BET angio volume
+        patch_center_coords: it contains the center coordinates of the retained patches (i.e. patches that fulfilled the extraction criteria)
+        shift_scale_1: half patch side
+        orig_bfc_angio_sitk: sitk volume of the bias-field-corrected, non-resampled angio
+        aff_mat_resampled: affine matrix of resampled space
+        tmp_path: path where we save temporary files
+        reduce_fp: if set to true, we only retain the "max_fp" most probable aneurysm candidates
+        max_fp: max numb. of aneurysms retained
+        remove_dark_fp: if set to True, candidate aneurysms that are not brighter than a certain threshold (on average) are discarded
+        dark_fp_threshold: threshold used to remove predictions which are on average too dark for being a true aneurysm
+        original_bet_bfc_angio: bias-field-corrected angio volume after BET before resampling
+        sub_ses: subject id and session id
+        test_time_augmentation: whether to perform test-time augmentation
+        unet_batch_size: batch size. Not really relevant (cause we're doing inference), but still needed
     """
     # start_out_dir = time.time()
 
@@ -1879,28 +1881,28 @@ def extract_distance_one_aneurysm(subdir: str,
         return None  # in any case the Nones will be removed later
 
 
-def extract_distance_thresholds(bids_ds_path,
-                                reg_quality_metrics_threshold,
-                                sub_ses_test,
-                                n_parallel_jobs,
-                                overlapping,
-                                patch_side,
-                                landmarks_physical_space_path,
-                                out_dir):
+def extract_distance_thresholds(bids_ds_path: str,
+                                reg_quality_metrics_threshold: tuple,
+                                sub_ses_test: list,
+                                n_parallel_jobs: int,
+                                overlapping: float,
+                                patch_side: int,
+                                landmarks_physical_space_path: str,
+                                out_dir: str) -> tuple:
     """This function computes the distances from the true aneurysms of the train input dataset to the landmark points where aneurysm occurrence is most frequent.
     From the distribution of these distances, it extracts the min and the mean value which will be used in the sliding-window to extract anatomically-plausible
     patches (i.e. patches which are "not-too-far" from the landmark points).
     Args:
-        bids_ds_path (str): path to BIDS dataset
-        reg_quality_metrics_threshold (tuple): it contains some registration quality metrics to assess whether the registration was accurate or not for each subject
-        sub_ses_test (list): sub_ses of the test set; we use it to take only the sub_ses of the training set
-        n_parallel_jobs (int): number of jobs to run in parallel with joblib
-        overlapping (float): amount of overlapping between patches in sliding-window approach
-        patch_side (int): side of cubic patches
-        landmarks_physical_space_path (str): path to file containing the landmark points in MNI physical space
-        out_dir (str): path to folder where output files will be saved
+        bids_ds_path: path to BIDS dataset
+        reg_quality_metrics_threshold: it contains some registration quality metrics to assess whether the registration was accurate or not for each subject
+        sub_ses_test: sub_ses of the test set; we use it to take only the sub_ses of the training set
+        n_parallel_jobs: number of jobs to run in parallel with joblib
+        overlapping: amount of overlapping between patches in sliding-window approach
+        patch_side: side of cubic patches
+        landmarks_physical_space_path: path to file containing the landmark points in MNI physical space
+        out_dir: path to folder where output files will be saved
     Returns:
-        distances_thresholds (tuple): it contains min and mean values extracted from the distribution of distances; we'll use these in the anatomically-informed sliding-window
+        distances_thresholds: it contains min and mean values extracted from the distribution of distances; we'll use these in the anatomically-informed sliding-window
     """
     all_subdirs = []  # type: list
     all_files = []  # type: list
@@ -1947,16 +1949,16 @@ def extract_distance_thresholds(bids_ds_path,
     return distances_thresholds
 
 
-def extract_dark_fp_threshold_one_aneurysm(subdir,
-                                           aneur_path,
-                                           bids_dir):
+def extract_dark_fp_threshold_one_aneurysm(subdir: str,
+                                           aneur_path: str,
+                                           bids_dir: str) -> float:
     """This function computes the intensity ratio of one aneurysm
     Args:
-        subdir (str): parent directory to aneurysm nifti file
-        aneur_path (str): filename of aneurysm nifti file
-        bids_dir (str): path to BIDS dataset
+        subdir: parent directory to aneurysm nifti file
+        aneur_path: filename of aneurysm nifti file
+        bids_dir: path to BIDS dataset
     Returns:
-        intensity_ratio (float): computed as mean_aneurysm_intensity/p90 where p90 is the 90th percentile of the original bias-field-corrected TOF volume after brain extraction before resampling
+        intensity_ratio: computed as mean_aneurysm_intensity/p90 where p90 is the 90th percentile of the original bias-field-corrected TOF volume after brain extraction before resampling
     """
     sub = re.findall(r"sub-\d+", subdir)[0]
     ses = re.findall(r"ses-\w{6}\d+", subdir)[0]  # extract ses
@@ -2032,36 +2034,36 @@ def extract_dark_fp_threshold(bids_dir: str,
     return dark_fp_threshold
 
 
-def extract_thresholds_for_anatomically_informed(bids_dir,
-                                                 sub_ses_test,
-                                                 unet_patch_side,
-                                                 new_spacing,
-                                                 inference_outputs_path,
-                                                 nb_parallel_jobs,
-                                                 overlapping,
-                                                 landmarks_physical_space_path,
-                                                 out_dir,
-                                                 only_pretrain_on_adam,
-                                                 bids_dir_adam):
+def extract_thresholds_for_anatomically_informed(bids_dir: str,
+                                                 sub_ses_test: list,
+                                                 unet_patch_side: int,
+                                                 new_spacing: list,
+                                                 inference_outputs_path: str,
+                                                 nb_parallel_jobs: int,
+                                                 overlapping: float,
+                                                 landmarks_physical_space_path: str,
+                                                 out_dir: str,
+                                                 only_pretrain_on_adam: bool,
+                                                 bids_dir_adam: str) -> Tuple[tuple, tuple, tuple, float]:
     """This function computes some thresholds that are needed for the anatomically-informed sliding-window approach. Specifically, it computes the registration quality metrics
     thresholds, some intensity thresholds and the distance thresholds.
     Args:
-        bids_dir (str): path to BIDS dataset
-        sub_ses_test (list): sub_ses of the test set; we use it to take only the sub_ses of the training set
-        unet_patch_side (int): patch side of cubic patches
-        new_spacing (list): desired voxel spacing that we want
-        inference_outputs_path (str): path to folder where we save all the outputs of the patient-wise analysis
-        nb_parallel_jobs (int): number of jobs to run in parallel with joblib
-        overlapping (float): amount of overlapping between patches in sliding-window approach
-        landmarks_physical_space_path (str): path to file containing the landmark points in MNI physical space
-        out_dir (str): path to folder where output files will be saved
-        only_pretrain_on_adam (bool): if True, we will do inference with a model that was only pretrained on ADAM and not finetuned on inhouse CHUV
-        bids_dir_adam (str): path to ADAM BIDS dataset
+        bids_dir: path to BIDS dataset
+        sub_ses_test: sub_ses of the test set; we use it to take only the sub_ses of the training set
+        unet_patch_side: patch side of cubic patches
+        new_spacing: desired voxel spacing that we want
+        inference_outputs_path: path to folder where we save all the outputs of the patient-wise analysis
+        nb_parallel_jobs: number of jobs to run in parallel with joblib
+        overlapping: amount of overlapping between patches in sliding-window approach
+        landmarks_physical_space_path: path to file containing the landmark points in MNI physical space
+        out_dir: path to folder where output files will be saved
+        only_pretrain_on_adam: if True, we will do inference with a model that was only pretrained on ADAM and not finetuned on inhouse CHUV
+        bids_dir_adam: path to ADAM BIDS dataset
     Returns:
-        reg_quality_metrics_threshold (tuple): thresholds to use to check whether the registration of a patient was correct or not
-        intensity_thresholds (tuple): thresholds to use for extracting bright negative patches (that ideally contain vessels)
-        distances_thresholds (tuple): thresholds to use for selecting patches which are "not-too-far" from the landmark points
-        dark_fp_threshold (float): threshold used to remove predictions which are on average too dark for being a true aneurysm
+        reg_quality_metrics_threshold: thresholds to use to check whether the registration of a patient was correct or not
+        intensity_thresholds: thresholds to use for extracting bright negative patches (that ideally contain vessels)
+        distances_thresholds: thresholds to use for selecting patches which are "not-too-far" from the landmark points
+        dark_fp_threshold: threshold used to remove predictions which are on average too dark for being a true aneurysm
     """
     if only_pretrain_on_adam:  # if we do inference with a model that was only pre-trained on ADAM and not finetuned on inhouse CHUV
         bids_dir = bids_dir_adam  # change input dataset
