@@ -63,7 +63,7 @@ def create_input_lists(bids_dir: str) -> Tuple[list, list]:
         for file in files:
             ext = os.path.splitext(file)[-1].lower()  # get the file extension
             # only retain paths of skull-stripped N4 bias field corrected volumes
-            if regexp_sub.search(file) and ext in ext_gz and "N4bfc_brain_mask" in file and "N4_bias_field_corrected" in subdir:
+            if regexp_sub.search(file) and ext == ext_gz and "N4bfc_brain_mask" in file and "N4_bias_field_corrected" in subdir:
                 all_subdirs.append(subdir)
                 all_files.append(file)
 
