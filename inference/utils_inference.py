@@ -450,8 +450,14 @@ def resample_volume(volume_path: str,
     original_size = volume.GetSize()  # extract size
     original_spacing = volume.GetSpacing()  # extract spacing
     new_size = [int(round(osz * ospc / nspc)) for osz, ospc, nspc in zip(original_size, original_spacing, new_spacing)]
-    resampled_volume_sitk_obj = sitk.Resample(volume, new_size, sitk.Transform(), interpolator,
-                                              volume.GetOrigin(), new_spacing, volume.GetDirection(), 0,
+    resampled_volume_sitk_obj = sitk.Resample(volume,
+                                              new_size,
+                                              sitk.Transform(),
+                                              interpolator,
+                                              volume.GetOrigin(),
+                                              new_spacing,
+                                              volume.GetDirection(),
+                                              0,
                                               volume.GetPixelID())
     sitk.WriteImage(resampled_volume_sitk_obj, out_path)  # write sitk volume object to disk
     resampled_volume_nii_obj = nib.load(out_path)  # type: nib.Nifti1Image # load volume as nibabel object
