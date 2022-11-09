@@ -28,7 +28,7 @@ import pickle
 import argparse
 import json
 from typing import Tuple, Any
-from dataset_creation.utils_dataset_creation import extract_lesion_info_from_resampled_mask_volume, extract_lesion_info, print_running_time
+from dataset_creation.utils_dataset_creation import extract_lesion_info_from_resampled_mask_volume, extract_lesion_info, resample_volume, print_running_time
 from show_results.utils_show_results import sort_dict_by_value, round_half_up
 
 
@@ -429,42 +429,6 @@ def retrieve_registration_params(registration_dir_: str) -> Tuple[str, str, str,
     assert cnt == 4, "Exactly 4 registration parameters must be retrieved"
 
     return mni_2_t1_mat_path_, struct_2_tof_mat_path_, mni_2_t1_warp_path_, mni_2_t1_inverse_warp_path_
-
-
-def resample_volume(volume_path: str,
-                    new_spacing: list,
-                    out_path: str,
-                    interpolator: int = sitk.sitkLinear) -> Tuple[sitk.Image, nib.Nifti1Image, np.ndarray]:
-    """This function resamples the input volume to a specified voxel spacing
-    Args:
-        volume_path: input volume path
-        new_spacing: desired voxel spacing that we want
-        out_path: path where we temporarily save the resampled output volume
-        interpolator: interpolator that we want to use (e.g. 1= NearNeigh., 2=linear, ...)
-    Returns:
-        resampled_volume_sitk_obj: resampled volume as sitk object
-        resampled_volume_nii_obj: resampled volume as nib object
-        resampled_volume_nii: resampled volume as numpy array
-    """
-    volume = sitk.ReadImage(volume_path)  # read volume
-    original_size = volume.GetSize()  # extract size
-    original_spacing = volume.GetSpacing()  # extract spacing
-    new_size = [int(round(osz * ospc / nspc)) for osz, ospc, nspc in zip(original_size, original_spacing, new_spacing)]
-    resampled_volume_sitk_obj = sitk.Resample(volume,
-                                              new_size,
-                                              sitk.Transform(),
-                                              interpolator,
-                                              volume.GetOrigin(),
-                                              new_spacing,
-                                              volume.GetDirection(),
-                                              0,
-                                              volume.GetPixelID())
-    sitk.WriteImage(resampled_volume_sitk_obj, out_path)  # write sitk volume object to disk
-    resampled_volume_nii_obj = nib.load(out_path)  # type: nib.Nifti1Image # load volume as nibabel object
-    resampled_volume_nii = np.asanyarray(resampled_volume_nii_obj.dataobj)  # type: np.ndarray # convert from nibabel object to np.array
-    os.remove(out_path)  # remove volume from disk to save space
-
-    return resampled_volume_sitk_obj, resampled_volume_nii_obj, resampled_volume_nii
 
 
 def load_nifti_and_resample(volume_path: str,
