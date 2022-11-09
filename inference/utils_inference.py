@@ -581,7 +581,7 @@ def convert_angio_to_mni(original_angio_volume_sitk_: sitk.Image,
 
 def distance_is_plausible(patch_center_coordinates_physical_space: list,
                           df_landmarks_tof_space: pd.DataFrame,
-                          distances_thresholds: list) -> bool:
+                          distances_thresholds: tuple) -> bool:
     """This function takes as input the center of a candidate patch in angio voxel space and computes the distances from this point to a series of landmarks points
     (also warped to tof space) where aneurysms are recurrent. Then it returns True if the min and mean distances are within plausible ranges, otherwise it returns False.
     Args:
@@ -592,7 +592,7 @@ def distance_is_plausible(patch_center_coordinates_physical_space: list,
         True: if distances are within plausible ranges for aneurysms (ranges were computed empirically)
         False: if distances are not within plausible ranges for aneurysms (ranges were computed empirically)
         """
-    assert len(distances_thresholds) == 2, "List must have len==2; instead, len=={}".format(len(distances_thresholds))
+    assert len(distances_thresholds) == 2, "Tuple must have len==2; instead, len=={}".format(len(distances_thresholds))
 
     distances = []
     for _, coords in df_landmarks_tof_space.iterrows():
@@ -615,8 +615,8 @@ def extracting_conditions_are_met(angio_patch_after_bet_scale_1_: np.ndarray,
                                   patch_side_scale_1: int,
                                   df_landmarks_tof_space: pd.DataFrame,
                                   registration_accurate_enough: bool,
-                                  intensity_thresholds: list,
-                                  distances_thresholds: list,
+                                  intensity_thresholds: tuple,
+                                  distances_thresholds: tuple,
                                   anatomically_informed: bool) -> bool:
     """ This function checks whether the candidate patch fulfills specific extraction conditions. There are 6 main conditions checked:
         1) the corresponding vesselMNI patch must have intensity ratios (local and global) similar to positive patches (thresholds found empirically from pos. patches)
@@ -634,7 +634,7 @@ def extracting_conditions_are_met(angio_patch_after_bet_scale_1_: np.ndarray,
         patch_side_scale_1: side of sliding-window patches
         df_landmarks_tof_space: it contains the 3D coordinates of the landmark points where aneurysms are most recurrent (in physical tof space)
         registration_accurate_enough: it indicates whether the registration accuracy is high enough to perform the anatomically-informed sliding window
-        intensity_thresholds: it contains the thresholds for the intensity conditions, namely [q5_local_vessel_mni, q5_global_vessel_mni, q5_local_tof_bet, q5_global_tof_bet, q5_nz_vessel_mni]
+        intensity_thresholds: it contains the thresholds for the intensity conditions, namely (q5_local_vessel_mni, q5_global_vessel_mni, q5_local_tof_bet, q5_global_tof_bet, q5_nz_vessel_mni)
         distances_thresholds: it contains the thresholds for the distances from the patch centers to the landmark points
         anatomically_informed: whether to conduct the sliding-window in an anatomically-informed fashion or not
     Returns:
