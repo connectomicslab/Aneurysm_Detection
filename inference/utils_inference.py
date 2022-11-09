@@ -135,11 +135,11 @@ def retrieve_intensity_conditions_one_sub(subdir: str,
         AssertionError: if the session (i.e. exam date) was not found
         AssertionError: if the lesion name was not found
     """
-    assert os.path.exists(data_path), "path {} does not exist".format(data_path)
+    assert os.path.exists(data_path), "Path {} does not exist".format(data_path)
     vessel_mni_registration_dir = os.path.join(data_path, "derivatives", "registrations", "vesselMNI_2_angioTOF")
-    assert os.path.exists(vessel_mni_registration_dir), "path {} does not exist".format(vessel_mni_registration_dir)  # make sure that path exists
+    assert os.path.exists(vessel_mni_registration_dir), "Path {} does not exist".format(vessel_mni_registration_dir)  # make sure that path exists
     bfc_derivatives_dir = os.path.join(data_path, "derivatives", "N4_bias_field_corrected")
-    assert os.path.exists(bfc_derivatives_dir), "path {} does not exist".format(bfc_derivatives_dir)  # make sure that path exists
+    assert os.path.exists(bfc_derivatives_dir), "Path {} does not exist".format(bfc_derivatives_dir)  # make sure that path exists
 
     shift_scale_1 = patch_side // 2
 
@@ -1743,13 +1743,13 @@ def extract_distance_one_aneurysm(subdir: str,
         registration_params_dir = os.path.join(bids_path, "derivatives", "registrations", "reg_params")
         assert os.path.exists(registration_params_dir), "Path {} does not exist".format(registration_params_dir)
         bfc_derivatives_dir = os.path.join(bids_path, "derivatives", "N4_bias_field_corrected")
-        assert os.path.exists(bfc_derivatives_dir), "path {} does not exist".format(bfc_derivatives_dir)  # make sure that path exists
+        assert os.path.exists(bfc_derivatives_dir), "Path {} does not exist".format(bfc_derivatives_dir)  # make sure that path exists
 
         if "ADAM" in bfc_derivatives_dir:
             bet_angio_bfc_path = os.path.join(bfc_derivatives_dir, sub, ses, "anat", "{}_{}_desc-angio_N4bfc_brain_mask_ADAM.nii.gz".format(sub, ses))  # type: str # save path of angio brain after Brain Extraction Tool (BET)
         else:
             bet_angio_bfc_path = os.path.join(bfc_derivatives_dir, sub, ses, "anat", "{}_{}_desc-angio_N4bfc_brain_mask.nii.gz".format(sub, ses))  # type: str # save path of angio brain after Brain Extraction Tool (BET)
-        assert os.path.exists(bet_angio_bfc_path), "path {} does not exist".format(bet_angio_bfc_path)  # make sure that path exists
+        assert os.path.exists(bet_angio_bfc_path), "Path {} does not exist".format(bet_angio_bfc_path)  # make sure that path exists
 
         # since we are running patients in parallel, we must create separate tmp folders, otherwise we risk to overwrite/overload files of other subjects
         tmp_folder = os.path.join(out_dir, "tmp_{}_{}_{}_pos_patches".format(sub, ses, lesion_name))
@@ -1919,13 +1919,13 @@ def extract_dark_fp_threshold_one_aneurysm(subdir: str,
     ses = re.findall(r"ses-\w{6}\d+", subdir)[0]  # extract ses
     # print("{}_{}".format(sub, ses))
     bfc_derivatives_dir = os.path.join(bids_dir, "derivatives", "N4_bias_field_corrected")
-    assert os.path.exists(bfc_derivatives_dir), "path {} does not exist".format(bfc_derivatives_dir)  # make sure that path exists
+    assert os.path.exists(bfc_derivatives_dir), "Path {} does not exist".format(bfc_derivatives_dir)  # make sure that path exists
 
     if "ADAM" in bfc_derivatives_dir:
         bet_angio_bfc_path = os.path.join(bfc_derivatives_dir, sub, ses, "anat", "{}_{}_desc-angio_N4bfc_brain_mask_ADAM.nii.gz".format(sub, ses))  # type: str # save path of angio brain after Brain Extraction Tool (BET)
     else:
         bet_angio_bfc_path = os.path.join(bfc_derivatives_dir, sub, ses, "anat", "{}_{}_desc-angio_N4bfc_brain_mask.nii.gz".format(sub, ses))  # type: str # save path of angio brain after Brain Extraction Tool (BET)
-    assert os.path.exists(bet_angio_bfc_path), "path {} does not exist".format(bet_angio_bfc_path)  # make sure that path exists
+    assert os.path.exists(bet_angio_bfc_path), "Path {} does not exist".format(bet_angio_bfc_path)  # make sure that path exists
 
     bet_angio_bfc_obj = nib.load(bet_angio_bfc_path)  # type: nib.Nifti1Image
     bet_angio_bfc_volume = np.asanyarray(bet_angio_bfc_obj.dataobj)  # type: np.ndarray
