@@ -487,9 +487,9 @@ def extract_neg_patches_from_anatomical_landmarks(lesion_coords: dict,
 
         # UNCOMMENT lines below to check correspondence between original and resampled volume
         # load original angio TOF with sitk
-        angio_volume_sitk = sitk.ReadImage(orig_angio_path)
+        # angio_volume_sitk = sitk.ReadImage(orig_angio_path)
         # convert patch center coordinate from physical space (mm) to voxel space
-        center_voxel_coord_tof = list(angio_volume_sitk.TransformPhysicalPointToIndex(center_mm_coord_tof))
+        # center_voxel_coord_tof = list(angio_volume_sitk.TransformPhysicalPointToIndex(center_mm_coord_tof))
 
         # convert point from original space to resampled space
         center_voxel_coord_tof_resampled = resampled_bfc_tof_volume_sitk.TransformPhysicalPointToIndex(center_mm_coord_tof)
@@ -1168,20 +1168,24 @@ def create_bin_sphere(arr_size: tuple,
     return binary_output
 
 
-def extract_lesion_info(lesion_volume: np.ndarray,
+def extract_lesion_info(path_to_lesion: str,
                         prints: bool = False) -> dict:
-    """This function extracts the lesion info for a binary mask (e.g. the voxel center, the equivalent diameter, etc.)
+    """This function takes as input the path of a binary volumetric mask, loops through the slices which have some non-zero pixels and returns some information about the entire lesion: i.e.
+    number of slices enclosing the lesion, index of slice with more white pixels, the equivalent diameter of the lesion width in that specific slice, and the coordinates of the
+    centroid of the lesion. If "prints" is set to True, the method also prints this information.
     Args:
-        lesion_volume: binary mask volume
+        path_to_lesion: path to binary mask volume
         prints: if set to True, some information about the lesion is printed
     Returns:
         lesion_info: it contains the relevant lesion information
     """
     lesion_info = {}  # initialize empty dict; this will be the output of the function
+    lesion_obj = nib.load(path_to_lesion)  # load lesion volume as nibabel object
+    lesion_volume = np.asanyarray(lesion_obj.dataobj)  # convert from object to image (i.e. numpy array)
     if len(lesion_volume.shape) == 4:  # if the numpy array is not 3D
         lesion_volume = np.squeeze(lesion_volume, axis=3)  # we drop the fourth dimension (time dimension) which is useless in our case
 
-    assert np.array_equal(lesion_volume, lesion_volume.astype(bool)), "WATCH OUT: mask is not binary"
+    assert np.array_equal(lesion_volume, lesion_volume.astype(bool)), "WATCH OUT: mask is not binary for {}".format(path_to_lesion)
     assert np.count_nonzero(lesion_volume) > 0, "WATCH OUT: mask is empty (i.e. all zero-voxels)"
 
     labels_out = cc3d.connected_components(np.asarray(lesion_volume, dtype=int))
@@ -1241,12 +1245,13 @@ def weakify_voxelwise_label_one_sub(pos_path_path: str,
     last_part_of_path = os.path.basename(os.path.normpath(pos_path_path))
     filename_mask = last_part_of_path.replace("pos_patch_angio", "mask_patch")
 
-    voxelwise_mask_obj = nib.load(os.path.join(masks_path, sub_ses_lesion, patch_pair, filename_mask))
-    voxelwise_mask_patch = np.asanyarray(voxelwise_mask_obj.dataobj)  # type: np.ndarray
+    full_path_to_mask = os.path.join(masks_path, sub_ses_lesion, patch_pair, filename_mask)  # type: str
+    voxelwise_mask_obj = nib.load(full_path_to_mask)  # type: nib.Nifti1Image # load as nibabel object
+    voxelwise_mask_patch = np.asanyarray(voxelwise_mask_obj.dataobj)  # type: np.ndarray # extract image array with numpy
     if not np.array_equal(voxelwise_mask_patch, voxelwise_mask_patch.astype(bool)) and np.sum(voxelwise_mask_patch) != 0:
         raise ValueError("Voxelwise mask of positive patches must be binary and non-empty")
 
-    lesion = extract_lesion_info(voxelwise_mask_patch)
+    lesion = extract_lesion_info(full_path_to_mask)
     # N.B. I INVERT X and Y BECAUSE of OpenCV (see https://stackoverflow.com/a/56849032/9492673)
     x_center = lesion["centroid_y_coord"]  # extract y coordinate of lesion centroid
     y_center = lesion["centroid_x_coord"]  # extract x coordinate of lesion centroid
