@@ -28,7 +28,7 @@ import pickle
 import argparse
 import json
 from typing import Tuple, Any
-from dataset_creation.utils_dataset_creation import extract_lesion_info_modified, print_running_time
+from dataset_creation.utils_dataset_creation import extract_lesion_info_from_resampled_mask_volume, extract_lesion_info, print_running_time
 from show_results.utils_show_results import sort_dict_by_value, round_half_up
 
 
@@ -109,63 +109,6 @@ def extract_registration_quality_metrics(bids_ds_path: str,
     return p3_neigh_corr_struct_2_tof, p97_mut_inf_struct_2_tof
 
 
-def extract_lesion_info_inference(path_to_lesion: str,
-                                  prints=False):
-    """This function takes as input the path of a binary volumetric mask, loops through the slices which have some non-zero pixels and returns some information about the entire lesion: i.e.
-    number of slices enclosing the lesion, index of slice with more white pixels, the equivalent diameter of the lesion width in that specific slice, and the coordinates of the
-    centroid of the lesion. If "prints" is set to True, the method also prints this information."""
-
-    lesion_info = {}  # initialize empty dict; this will be the output of the function
-    lesion_obj = nib.load(path_to_lesion)  # load lesion volume as nibabel object
-    lesion_volume = lesion_obj.get_fdata()  # convert from object to image (i.e. numpy array)
-    if len(lesion_volume.shape) != 3:  # if the numpy array is not 3D
-        lesion_volume = np.squeeze(lesion_volume, axis=3)  # we drop the fourth dimension (time dimension) which is useless in our case
-
-    assert np.array_equal(lesion_volume, lesion_volume.astype(bool)), "WATCH OUT: mask is not binary for {}".format(path_to_lesion)
-    assert np.count_nonzero(lesion_volume) > 0, "WATCH OUT: mask is empty (i.e. all zero-voxels)"
-
-    labels_out = cc3d.connected_components(np.asarray(lesion_volume, dtype=int))
-    numb_labels = np.max(labels_out)  # extract number of different connected components found
-    assert numb_labels == 1, "This function is intended for binary masks that only contain ONE lesion."
-
-    slices_enclosing_aneurysms = 0  # it's gonna be the number of slices that enclose the aneurysm
-    idx = 0  # it's gonna be the index of the slice with the biggest lesion (the biggest number of white pixels)
-    nb_white_pixels = 0
-    tot_nb_white_pixels = []  # type: list # will contain the number of white pixels for each non-empty slice
-    for z in range(0, lesion_volume.shape[2]):  # z will be the index of the slices
-        if np.sum(lesion_volume[:, :, z]) != 0:  # if the sum of the pixels is different than zero (i.e. if there's at least one white pixel)
-            slices_enclosing_aneurysms += 1  # increment
-            tot_nb_white_pixels.append(np.count_nonzero(lesion_volume[:, :, z]))
-            if np.count_nonzero(lesion_volume[:, :, z]) > nb_white_pixels:  # for the first iteration, we compare to 0, so the if is always verified if there's at least one non-zero pixel
-                nb_white_pixels = np.count_nonzero(lesion_volume[:, :, z])  # update max number of white pixels if there are more than the previous slice
-                idx = z  # update slice index if there are more white pixels than the previous one
-    if prints:  # if prints is set to True when invoking the method
-        print("\nThe aneurysms is present in {} different slices.".format(slices_enclosing_aneurysms))
-        print("\nThe slice with more white pixels has index {} and contains {} white pixels. \n".format(idx, np.count_nonzero(lesion_volume[:, :, idx])))
-
-    properties = regionprops(lesion_volume[:, :, idx].astype(int))  # extract properties of slice with more white pixels
-
-    for p in properties:
-        equiv_diameter = np.array(p.equivalent_diameter).astype(int)  # we save the diameter of a circle with the same area as our ROI (we save it as int for simplicity)
-
-    m = cv2.moments(lesion_volume[:, :, idx])  # calculate moments of binary image
-    cx = int(m["m10"] / m["m00"])  # calculate x coordinate of center
-    cy = int(m["m01"] / m["m00"])  # calculate y coordinate of center
-    if prints:  # if prints is set to True when invoking the method
-        print("The widest ROI has an equivalent diameter of {} pixels and is approximately centered at x,y = [{},{}]\n".format(equiv_diameter, cx, cy))
-
-    # create dict fields (keys) and fill them with values
-    lesion_info["slices"] = slices_enclosing_aneurysms
-    lesion_info["idx_slice_with_more_white_pixels"] = idx
-    lesion_info["equivalent_diameter"] = equiv_diameter
-    lesion_info["centroid_x_coord"] = cx
-    lesion_info["centroid_y_coord"] = cy
-    lesion_info["widest_dimension"] = slices_enclosing_aneurysms if slices_enclosing_aneurysms > equiv_diameter else equiv_diameter  # save biggest dimension between the two
-    lesion_info["nb_non_zero_voxels"] = sum(tot_nb_white_pixels)  # sum all elements inside list
-
-    return lesion_info  # returns the dictionary with the lesion information
-
-
 def retrieve_intensity_conditions_one_sub(subdir: str,
                                           aneurysm_mask_path: str,
                                           data_path: str,
@@ -235,11 +178,12 @@ def retrieve_intensity_conditions_one_sub(subdir: str,
             vessel_mni_reg_volume_path = os.path.join(vessel_mni_registration_dir, sub, ses, "anat", "{}_{}_desc-vesselMNI2angio_deformed.nii.gz".format(sub, ses))
         assert os.path.exists(vessel_mni_reg_volume_path), "Path {} does not exist".format(vessel_mni_reg_volume_path)
 
+        # save path of corresponding brain-extracted and N4 bias-field-corrected tof-angio volume
         if "ADAM" in subdir:
             bet_angio_bfc_path = os.path.join(bfc_derivatives_dir, sub, ses, "anat", "{}_{}_desc-angio_N4bfc_brain_mask_ADAM.nii.gz".format(sub, ses))  # type: str # save path of angio brain after Brain Extraction Tool (BET)
         else:
             bet_angio_bfc_path = os.path.join(bfc_derivatives_dir, sub, ses, "anat", "{}_{}_desc-angio_N4bfc_brain_mask.nii.gz".format(sub, ses))  # type: str # save path of angio brain after Brain Extraction Tool (BET)
-        assert os.path.exists(bet_angio_bfc_path), "path {} does not exist".format(bet_angio_bfc_path)  # make sure that path exists
+        assert os.path.exists(bet_angio_bfc_path), "Path {} does not exist".format(bet_angio_bfc_path)  # make sure that path exists
 
         # Load N4 bias-field-corrected angio volume after BET and resample to new spacing
         out_path = os.path.join(tmp_folder, "resampled_bet_tof_bfc.nii.gz")
@@ -250,7 +194,7 @@ def retrieve_intensity_conditions_one_sub(subdir: str,
         out_path = os.path.join(tmp_folder, "resampled_vessel_atlas.nii.gz")
         _, _, vessel_mni_volume_resampled = resample_volume(vessel_mni_reg_volume_path, new_spacing, out_path)
 
-        lesion = (extract_lesion_info_modified(os.path.join(subdir, aneurysm_mask_path), tmp_folder, new_spacing, sub, ses))  # invoke external function and save dict with lesion information
+        lesion = (extract_lesion_info_from_resampled_mask_volume(os.path.join(subdir, aneurysm_mask_path), tmp_folder, new_spacing, sub, ses))  # invoke external function and save dict with lesion information
         sc_shift = lesion["widest_dimension"] // 2  # define Sanity Check shift (half side of widest lesion dimension)
         # N.B. I INVERT X and Y BECAUSE of OpenCV (see https://stackoverflow.com/a/56849032/9492673)
         x_center = lesion["centroid_y_coord"]  # extract y coordinate of lesion centroid
@@ -1784,6 +1728,7 @@ def extract_distance_one_aneurysm(subdir: str,
     assert len(ses) != 0, "Session number not found"
     assert len(lesion_name) != 0, "Lesion name not found"
 
+    # uncomment line below for debugging
     # print("{}_{}_{}".format(sub, ses, lesion_name))
 
     # if we are NOT dealing with a treated aneurysm
@@ -1809,14 +1754,18 @@ def extract_distance_one_aneurysm(subdir: str,
 
         bet_angio_bfc_obj = nib.load(bet_angio_bfc_path)  # type: nib.Nifti1Image
         bet_angio_bfc_volume = np.asanyarray(bet_angio_bfc_obj.dataobj)  # type: np.ndarray
-        rows_range, columns_range, slices_range = bet_angio_bfc_volume.shape  # save dimensions of resampled angio-BET volume
+        rows_range, columns_range, slices_range = bet_angio_bfc_volume.shape  # save dimensions of N4 bias-field-corrected, brain-extracted angio-BET volume
         bet_angio_bfc_sitk = sitk.ReadImage(bet_angio_bfc_path)
 
-        df_landmarks = pd.read_csv(landmarks_physical_space_path)  # type: pd.DataFrame
-        df_landmarks_tof_physical_space = convert_mni_to_angio(df_landmarks, bet_angio_bfc_sitk, tmp_folder, mni_2_struct_mat_path,
-                                                               struct_2_tof_mat_path, mni_2_struct_inverse_warp_path)  # type: pd.DataFrame
+        df_landmarks_mni_physical_space = pd.read_csv(landmarks_physical_space_path)  # type: pd.DataFrame
+        df_landmarks_tof_physical_space = convert_mni_to_angio(df_landmarks_mni_physical_space,
+                                                               bet_angio_bfc_sitk,
+                                                               tmp_folder,
+                                                               mni_2_struct_mat_path,
+                                                               struct_2_tof_mat_path,
+                                                               mni_2_struct_inverse_warp_path)  # type: pd.DataFrame
 
-        lesion = (extract_lesion_info_inference(os.path.join(subdir, aneur_path)))  # invoke external method and save dict with lesion information
+        lesion = extract_lesion_info(os.path.join(subdir, aneur_path))  # type: dict # invoke external method and save dict with lesion information
         sc_shift = lesion["widest_dimension"] // 2  # define Sanity Check shift (half side of widest lesion dimension)
         # N.B. I INVERT X and Y BECAUSE of OpenCV (see https://stackoverflow.com/a/56849032/9492673)
         x_center = lesion["centroid_y_coord"]  # extract x coordinate of lesion centroid
@@ -1936,7 +1885,7 @@ def extract_distance_thresholds(bids_ds_path: str,
                                                                                                        out_dir) for idx in range(len(all_subdirs)))
     out_list = [x for x in out_list if x]  # remove None values from list if present
 
-    out_list_np = np.asanyarray(out_list)
+    out_list_np = np.asanyarray(out_list)  # convert list to numpy array
     assert out_list_np.shape == (len(out_list), 2), "Shape mismatch"
     min_distances = out_list_np[:, 0]  # extract all min distances
     mean_distances = out_list_np[:, 1]  # extract all mean distances
