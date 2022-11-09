@@ -18,7 +18,7 @@ import random
 from random import randrange
 import numpy as np
 import nibabel as nib
-from dataset_creation.utils_dataset_creation import load_resampled_vol_and_boundaries, resample_volume, extract_lesion_info_modified, print_running_time, \
+from dataset_creation.utils_dataset_creation import load_resampled_vol_and_boundaries, resample_volume, extract_lesion_info_from_resampled_mask_volume, print_running_time, \
     nb_last_created_patch, extract_vessel_like_neg_patches, extract_random_neg_patches, extract_neg_landmark_patches, load_nifti_and_resample, \
     randomly_translate_coordinates, extract_thresholds_of_intensity_criteria, refine_weak_label_one_sub, load_pickle_list_from_disk, \
     weakify_voxelwise_label_one_sub
@@ -127,7 +127,7 @@ def extract_negative_patches(subdir,
         lesion_coord = {}  # initialize empty dict
         for aneur_path in lesions:  # loop over aneurysm(s) found for this patient
             # invoke external function and save dict with lesion information
-            lesion = (extract_lesion_info_modified(os.path.join(manual_masks_path, aneur_path), tmp_folder, desired_spacing, sub, ses))
+            lesion = (extract_lesion_info_from_resampled_mask_volume(os.path.join(manual_masks_path, aneur_path), tmp_folder, desired_spacing, sub, ses))
             sc_shift = lesion["widest_dimension"] // 2  # define sanity check shift (half side of cube)
             # N.B. invert x and y because because of OpenCV (cv2); see https://stackoverflow.com/a/56849032/9492673
             x_center = lesion["centroid_y_coord"]  # extract y coordinate of lesion centroid
@@ -247,7 +247,7 @@ def extract_positive_patches(subdir,
             assert os.path.exists(original_tof_bfc_path), "Path {} does not exist".format(original_tof_bfc_path)
 
             # invoke external method and save lesion information
-            lesion = (extract_lesion_info_modified(os.path.join(subdir, aneurysm_mask_path), tmp_folder, desired_spacing, sub, ses))
+            lesion = (extract_lesion_info_from_resampled_mask_volume(os.path.join(subdir, aneurysm_mask_path), tmp_folder, desired_spacing, sub, ses))
             # N.B. invert x and y because because of OpenCV (cv2); see https://stackoverflow.com/a/56849032/9492673
             x_center = lesion["centroid_y_coord"]  # extract x coordinate of lesion centroid
             y_center = lesion["centroid_x_coord"]  # extract y coordinate of lesion centroid
