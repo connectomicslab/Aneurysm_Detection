@@ -22,7 +22,7 @@ import re
 from joblib import Parallel, delayed
 import shutil
 import pickle
-from typing import List
+from typing import Tuple
 from show_results.utils_show_results import round_half_up
 
 
@@ -50,17 +50,20 @@ def print_running_time(start_time: float,
     print('\n%s time: %d hh %d mm %d ss' % (sentence, hours, minutes, seconds))
 
 
-def resample_volume(volume_path, new_spacing, out_path, interpolator=sitk.sitkLinear):
+def resample_volume(volume_path: str,
+                    new_spacing: list,
+                    out_path: str,
+                    interpolator: int = sitk.sitkLinear) -> Tuple[sitk.Image, nib.Nifti1Image, np.ndarray]:
     """This function resamples the input volume to a specified voxel spacing
     Args:
-        volume_path (str): input volume path
-        new_spacing (list): desired voxel spacing that we want
-        out_path (str): path where we temporarily save the resampled output volume
-        interpolator (int): interpolator that we want to use (e.g. 1= NearNeigh., 2=linear, ...)
+        volume_path: input volume path
+        new_spacing: desired voxel spacing that we want
+        out_path: path where we temporarily save the resampled output volume
+        interpolator: interpolator that we want to use (e.g. 1= NearNeigh., 2=linear, ...)
     Returns:
-        resampled_volume_sitk_obj (sitk.Image): resampled volume as sitk object
-        resampled_volume_nii_obj (nib.Nifti1Image): resampled volume as nib object
-        resampled_volume_nii (np.ndarray): resampled volume as numpy array
+        resampled_volume_sitk_obj: resampled volume as sitk object
+        resampled_volume_nii_obj: resampled volume as nib object
+        resampled_volume_nii: resampled volume as numpy array
     """
     volume = sitk.ReadImage(volume_path)  # read volume
     original_size = volume.GetSize()  # extract size
@@ -77,25 +80,29 @@ def resample_volume(volume_path, new_spacing, out_path, interpolator=sitk.sitkLi
     return resampled_volume_sitk_obj, resampled_volume_nii_obj, resampled_volume_nii
 
 
-def load_resampled_vol_and_boundaries(volume_path, new_spacing_, tmp_folder_, sub_, ses_):
+def load_resampled_vol_and_boundaries(volume_path: str,
+                                      new_spacing_: list,
+                                      tmp_folder_: str,
+                                      sub_: str,
+                                      ses_: str) -> Tuple[np.ndarray, np.ndarray, sitk.Image, int, int, int, int, int, int]:
     """This function loads a 3D nifti volume, converts it to numpy, resamples it to "new_spacing_" and computes the boundaries
     of non-empty rows, columns and slices. It returns these boundaries, the numpy volume and the affine transformation of the nifti object.
     Args:
-        volume_path (str): path where nii.gz file is stored
-        new_spacing_ (list): voxel spacing to which we want to resample
-        tmp_folder_ (str): path where we temporarily store the resampled volumes
-        sub_ (str): current subject
-        ses_ (str): current session
+        volume_path: path where nii.gz file is stored
+        new_spacing_: voxel spacing to which we want to resample
+        tmp_folder_: path where we temporarily store the resampled volumes
+        sub_: current subject
+        ses_: current session
     Returns:
-        resampled_volume (np.array): nifti volume as numpy array
-        affine_transf (np_array): affine matrix of nifti object
-        resampled_volume_obj_sitk (sitk.Image): sitk resampled volume
-        min_x_nii_volume (int): min non-zero row
-        max_x_nii_volume (int): max non-zero row
-        min_y_nii_volume (int): min non-zero column
-        max_y_nii_volume (int): max non-zero column
-        min_z_nii_volume (int): min non-zero slice of numpy volume
-        max_z_nii_volume (int): max non-zero slice of numpy volume
+        resampled_volume: nifti volume as numpy array
+        affine_transf: affine matrix of nifti object
+        resampled_volume_obj_sitk: sitk resampled volume
+        min_x_nii_volume: min non-zero row
+        max_x_nii_volume: max non-zero row
+        min_y_nii_volume: min non-zero column
+        max_y_nii_volume: max non-zero column
+        min_z_nii_volume: min non-zero slice of numpy volume
+        max_z_nii_volume: max non-zero slice of numpy volume
     """
     out_path = os.path.join(tmp_folder_, "{}_{}_resampled_bet_tof_bfc.nii.gz".format(sub_, ses_))
     resampled_volume_obj_sitk, resampled_volume_obj_nib, resampled_volume = resample_volume(volume_path, new_spacing_, out_path)
@@ -110,19 +117,23 @@ def load_resampled_vol_and_boundaries(volume_path, new_spacing_, tmp_folder_, su
     return resampled_volume, affine_transf, resampled_volume_obj_sitk, min_x_nii_volume, max_x_nii_volume, min_y_nii_volume, max_y_nii_volume, min_z_nii_volume, max_z_nii_volume
 
 
-def load_nifti_and_resample(volume_path, tmp_folder_, out_name, new_spacing_, binary_mask=False):
+def load_nifti_and_resample(volume_path: str,
+                            tmp_folder_: str,
+                            out_name: str,
+                            new_spacing_: list,
+                            binary_mask: bool = False) -> Tuple[nib.Nifti1Image, np.ndarray, np.ndarray]:
     """This function loads a nifti volume, resamples it to a specified voxel spacing, and returns both
     the resampled nifti object and the resampled volume as numpy array, together with the affine matrix
     Args:
-        volume_path (str): path to nifti volume
-        tmp_folder_ (str): path to folder where we temporarily save the resampled volume
-        out_name (str): name of resampled volume temporarily saved to disk
-        new_spacing_ (list): desired voxel spacing for output volume
-        binary_mask (bool): defaults to False. If set to True, it means that the volume is a binary mask
+        volume_path: path to nifti volume
+        tmp_folder_: path to folder where we temporarily save the resampled volume
+        out_name: name of resampled volume temporarily saved to disk
+        new_spacing_: desired voxel spacing for output volume
+        binary_mask: defaults to False. If set to True, it means that the volume is a binary mask
     Returns:
-        resampled_volume_obj_nib (Nifti1Image): nibabel object of resampled output volume
-        resampled_volume (np.ndarray): resampled output volume
-        aff_matrix (np.ndarray): affine matrix associated with resampled output volume
+        resampled_volume_obj_nib: nibabel object of resampled output volume
+        resampled_volume: resampled output volume
+        aff_matrix: affine matrix associated with resampled output volume
     """
     out_path = os.path.join(tmp_folder_, out_name)
     if binary_mask:  # if the volume is a mask, use near.neighbor interpolator in order not to create new connected components
@@ -134,20 +145,25 @@ def load_nifti_and_resample(volume_path, tmp_folder_, out_name, new_spacing_, bi
     return resampled_volume_obj_nib, resampled_volume, aff_matrix
 
 
-def extract_lesion_info_modified(path_to_lesion, tmp_folder, new_spacing, sub_, ses_, prints=False):
-    """This function takes as input the path of a binary volumetric mask, loops through the slices which have some non-zero pixels and returns
-    some information about the entire lesion: i.e. number of slices enclosing the lesion, index of slice with more white pixels, the equivalent
-    diameter of the lesion width in that specific slice, and the coordinates of the centroid of the lesion. If "prints" is set to True, the
-    function also prints this information.
+def extract_lesion_info_from_resampled_mask_volume(path_to_lesion: str,
+                                                   tmp_folder: str,
+                                                   new_spacing: list,
+                                                   sub_: str,
+                                                   ses_: str,
+                                                   prints: bool = False) -> dict:
+    """This function takes as input the path of a binary volumetric mask, loads the volumetric mask, resamples it to the desired voxel spacing,
+    loops through the slices which have some non-zero pixels and returns some information about the entire lesion: i.e. number of slices enclosing
+    the lesion, index of slice with more white pixels, the equivalent diameter of the lesion width in that specific slice, and the coordinates of
+    the centroid of the lesion. If "prints" is set to True, the function also prints this information.
     Args:
-        path_to_lesion (str): path to the binary mask of the aneurysm
-        tmp_folder (str): path to folder where we temporarily save the resampled volumes
-        new_spacing (list): desired voxel spacing
-        sub_ (str): subject of interest
-        ses_ (str): session of interest
-        prints (bool): defaults to False. If set to True, it prints some information about the lesion
+        path_to_lesion: path to the binary mask of the aneurysm
+        tmp_folder: path to folder where we temporarily save the resampled volumes
+        new_spacing: desired voxel spacing
+        sub_: subject of interest
+        ses_: session of interest
+        prints: defaults to False. If set to True, it prints some information about the lesion
     Returns:
-        lesion_info (dict): it contains some info/metrics about the lesion
+        lesion_info: it contains some info/metrics about the lesion
     Raises:
         AssertionError: if the binary mask is either non-binary or full of zeros
         AssertionError: if the binary mask has more than 1 connected component
@@ -269,7 +285,9 @@ def extracting_conditions_are_met(seed_,
     return conditions_fulfilled
 
 
-def retrieve_registration_params(registration_dir_, sub_, ses_):
+def retrieve_registration_params(registration_dir_,
+                                 sub_,
+                                 ses_):
     """This function retrieves the registration parameters for each subject
     Args:
         registration_dir_ (str): root path where all subject folders containing the registration parameters are stored
@@ -322,7 +340,16 @@ def retrieve_registration_params(registration_dir_, sub_, ses_):
     return mni_2_struct_mat_path, struct_2_tof_mat_path, mni_2_struct_warp_path, mni_2_struct_inverse_warp_path
 
 
-def generate_candidate_patches(seed, angio_min_x, angio_max_x, angio_min_y, angio_max_y, angio_min_z, angio_max_z, shift_scale_1, vessel_mni_volume_resampled, resampled_tof_volume):
+def generate_candidate_patches(seed,
+                               angio_min_x,
+                               angio_max_x,
+                               angio_min_y,
+                               angio_max_y,
+                               angio_min_z,
+                               angio_max_z,
+                               shift_scale_1,
+                               vessel_mni_volume_resampled,
+                               resampled_tof_volume):
     """This function generates a random angio-tof candidate patch and the corresponding vessel patch
     Args:
         seed (int): random seed used to select a center coordinate
@@ -361,27 +388,37 @@ def generate_candidate_patches(seed, angio_min_x, angio_max_x, angio_min_y, angi
     return random_x_coord, random_y_coord, random_z_coord, random_neg_patch_vessel, random_neg_patch_angio
 
 
-def extract_neg_patches_from_anatomical_landmarks(lesion_coords, resampled_original_angio_volume, bet_volume_affine,
-                                                  registration_dir_, sub_, ses_, patch_pair_, mni_landmark_points_path,
-                                                  shift_scale_1, neg_patches_path, resampled_bfc_tof_volume_sitk, csv_folder, orig_angio_path):
+def extract_neg_patches_from_anatomical_landmarks(lesion_coords: dict,
+                                                  resampled_original_angio_volume: np.ndarray,
+                                                  bet_volume_affine: np.ndarray,
+                                                  registration_dir_: str,
+                                                  sub_: str,
+                                                  ses_: str,
+                                                  patch_pair_: int,
+                                                  mni_landmark_points_path: str,
+                                                  shift_scale_1: int,
+                                                  neg_patches_path: str,
+                                                  resampled_bfc_tof_volume_sitk: sitk.Image,
+                                                  csv_folder: str,
+                                                  orig_angio_path: str) -> int:
     """This function extracts negative patches (i.e. without aneurysm) centered around some anatomical locations that are recurrent for aneurysm occurrence.
     For patients, it extracts the patches only if the created patch do not overlap with any of the aneurysms of the patient.
     Args:
-        lesion_coords (dict): it contains the x,y,z min and max limits of the patient's lesion. If sub is a control, lesion_coords is defined as empty
-        resampled_original_angio_volume (np.ndarray): resampled original angio-TOF volume (before brain extraction tool)
-        bet_volume_affine (np.ndarray): affine matrix of nibabel volume after brain extraction tool (bet)
-        registration_dir_ (str): root path where all subject folders containing the registration parameters are stored
-        sub_ (str): subject ID
-        ses_ (str): session date (YYYYMMDD)
-        patch_pair_ (int): last number of patch pair created before invoking this function
-        mni_landmark_points_path (str): path to csv file containing MNI landmark points in LPS convention
-        shift_scale_1 (int): half side of patches
-        neg_patches_path (str): path of folder containing negative patches
-        resampled_bfc_tof_volume_sitk (sitk.Image): sitk resampled bias-field-corrected tof
-        csv_folder (str): path to folder where we save temporary files deriving from the points registrations
-        orig_angio_path (str): path to original tof volume
+        lesion_coords: it contains the x,y,z min and max limits of the patient's lesion. If sub is a control, lesion_coords is defined as empty
+        resampled_original_angio_volume: resampled original angio-TOF volume (before brain extraction tool)
+        bet_volume_affine: affine matrix of nibabel volume after brain extraction tool (bet)
+        registration_dir_: root path where all subject folders containing the registration parameters are stored
+        sub_: subject ID
+        ses_: session date (YYYYMMDD)
+        patch_pair_: last number of patch pair created before invoking this function
+        mni_landmark_points_path: path to csv file containing MNI landmark points in LPS convention
+        shift_scale_1: half side of patches
+        neg_patches_path: path of folder containing negative patches
+        resampled_bfc_tof_volume_sitk: sitk resampled bias-field-corrected tof
+        csv_folder: path to folder where we save temporary files deriving from the points registrations
+        orig_angio_path: path to original tof volume
     Returns:
-        nb_landmarks (int): number of landmark points used for the patch extraction
+        nb_landmarks: number of landmark points used for the patch extraction
     Raises:
         AssertionError: if bet_volume is not three-dimensional
         AssertionError: if original angio volume is not three-dimensional
@@ -487,10 +524,22 @@ def extract_neg_patches_from_anatomical_landmarks(lesion_coords, resampled_origi
                     print("Negative patches {} created at center coordinates [{}, {}, {}]".format(patch_pair_, center_voxel_coord_tof_resampled[0], center_voxel_coord_tof_resampled[1], center_voxel_coord_tof_resampled[2]))
 
                     patch_pair_ += 1  # increment patch pair such that the name of the following pair will change
+
     return nb_landmarks
 
 
-def create_negative_patch(output_path, sub, ses, n, seed, x_coord, y_coord, z_coord, random_neg_patch_angio, resampled_bfc_tof_aff_mat, neg_patches_path, vessel_like=False):
+def create_negative_patch(output_path,
+                          sub,
+                          ses,
+                          n,
+                          seed,
+                          x_coord,
+                          y_coord,
+                          z_coord,
+                          random_neg_patch_angio,
+                          resampled_bfc_tof_aff_mat,
+                          neg_patches_path,
+                          vessel_like=False):
     """This function saves the extracted patch to disk
     Args:
         output_path (str): path where we will save the extracted patch
@@ -525,14 +574,14 @@ def create_negative_patch(output_path, sub, ses, n, seed, x_coord, y_coord, z_co
     print("Negative patch {} created at center coordinates [i, j, k] = [{}, {}, {}]".format(n, x_coord, y_coord, z_coord))
 
 
-def nb_last_created_patch(input_path):
+def nb_last_created_patch(input_path: str) -> Tuple[int, list, list]:
     """This function returns the maximum number contained in the folder names of a specific path
     Args:
-        input_path (str): path where we search for the folder names
+        input_path: path where we search for the folder names
     Returns:
-        max_numb (int): highest number across folder names
-        folder_list_only_landmark_patches (list): it contains the path to landmark patches (if any)
-        folder_list_only_random_patches (list): it contains the path to the random patches (if any)
+        max_numb: highest number across folder names
+        folder_list_only_landmark_patches: it contains the path to landmark patches (if any)
+        folder_list_only_random_patches: it contains the path to the random patches (if any)
     """
     if not os.path.exists(input_path):  # if path does not exist
         os.makedirs(input_path)  # create it
@@ -541,20 +590,36 @@ def nb_last_created_patch(input_path):
     folder_list_only_landmark_patches = []  # initialize as empty list; if it will be changed, it means that there are already landmark negative patches in the folder
     folder_list_only_random_patches = []  # initialize as empty list; if it will be changed, it means that there are already random negative patches in the folder
 
-    # if list is non-emtpy
+    # if folder_list is non-emtpy
     if folder_list:
         folder_lists_only_numbers = [int(re.sub("[^0-9]", "", item)) for item in folder_list]  # retain from each folder name only the numbers
         folder_list_only_landmark_patches = [item for item in folder_list if "landmark" in item]
         folder_list_only_random_patches = [item for item in folder_list if "random" in item]
-        max_numb = max(folder_lists_only_numbers)  # extract highest number
-    # instead, if there are already other folders
-    else:
+        max_numb = int(round_half_up(max(folder_lists_only_numbers)))  # extract highest number
+
+    else:  # instead, if folder_list is empty
         max_numb = 1
+
     return max_numb, folder_list_only_landmark_patches, folder_list_only_random_patches
 
 
-def extract_vessel_like_neg_patches(nb_vessel_like_patches_per_sub, angio_min_x, angio_max_x, angio_min_y, angio_max_y, angio_min_z, angio_max_z, shift_scale_1,
-                                    vessel_mni_volume_resampled, resampled_bfc_tof_volume, lesion_coord, patch_side, neg_patches_path, sub, ses, resampled_bfc_tof_aff_mat, intensity_thresholds):
+def extract_vessel_like_neg_patches(nb_vessel_like_patches_per_sub,
+                                    angio_min_x,
+                                    angio_max_x,
+                                    angio_min_y,
+                                    angio_max_y,
+                                    angio_min_z,
+                                    angio_max_z,
+                                    shift_scale_1,
+                                    vessel_mni_volume_resampled,
+                                    resampled_bfc_tof_volume,
+                                    lesion_coord,
+                                    patch_side,
+                                    neg_patches_path,
+                                    sub,
+                                    ses,
+                                    resampled_bfc_tof_aff_mat,
+                                    intensity_thresholds):
     """This function extracts the negative patches located in correspondence of brain vessels
     Args:
         nb_vessel_like_patches_per_sub (int): number of vessel-like patches to extract
@@ -608,9 +673,25 @@ def extract_vessel_like_neg_patches(nb_vessel_like_patches_per_sub, angio_min_x,
     return seed_ext
 
 
-def extract_random_neg_patches(n, nb_random_patches_per_sub, angio_min_x, angio_max_x, angio_min_y, angio_max_y, angio_min_z, angio_max_z, shift_scale_1,
-                               vessel_mni_volume_resampled, resampled_bfc_tof_volume, seed_ext, lesion_coord, patch_side, neg_patches_path, sub, ses,
-                               resampled_bfc_tof_aff_mat, random_patches_list):
+def extract_random_neg_patches(n,
+                               nb_random_patches_per_sub,
+                               angio_min_x,
+                               angio_max_x,
+                               angio_min_y,
+                               angio_max_y,
+                               angio_min_z,
+                               angio_max_z,
+                               shift_scale_1,
+                               vessel_mni_volume_resampled,
+                               resampled_bfc_tof_volume,
+                               seed_ext,
+                               lesion_coord,
+                               patch_side,
+                               neg_patches_path,
+                               sub,
+                               ses,
+                               resampled_bfc_tof_aff_mat,
+                               random_patches_list):
     """This function extracts some random negative patches located in the brain
     Args:
         n (int): number of last negative patch extracted for this subject
@@ -670,8 +751,37 @@ def extract_random_neg_patches(n, nb_random_patches_per_sub, angio_min_x, angio_
                 break  # stop while loop
 
 
-def extract_neg_landmark_patches(neg_patches_path, sub, ses, n, tmp_folder, original_angio_volume_path, desired_spacing, resampled_bfc_tof_aff_mat,
-                                 registrations_dir, mni_landmark_points_path, shift_scale_1, resampled_bfc_tof_volume_sitk, lesion_coord, landmark_patches_list):
+def extract_neg_landmark_patches(neg_patches_path: str,
+                                 sub: str,
+                                 ses: str,
+                                 n: int,
+                                 tmp_folder: str,
+                                 original_angio_volume_path: str,
+                                 desired_spacing: list,
+                                 resampled_bfc_tof_aff_mat: np.ndarray,
+                                 registrations_dir: str,
+                                 mni_landmark_points_path: str,
+                                 shift_scale_1: int,
+                                 resampled_bfc_tof_volume_sitk: sitk.Image,
+                                 lesion_coord: dict,
+                                 landmark_patches_list: list) -> None:
+    """This function extracts the negative patches that are located in correspondence of the landmark points.
+    Args:
+        neg_patches_path: path to directory that will contain the negative patches
+        sub: sub of interest
+        ses: session date (YYYYMMDD)
+        n: nb. negative patches created so far
+        tmp_folder: temporary dir where we save tmp files
+        original_angio_volume_path: path to original angio-tof volume
+        desired_spacing: desired spacing to which we want to resample
+        resampled_bfc_tof_aff_mat: affine matrix of resampled bias-field-corrected tof volume
+        registrations_dir: directory where registration params were stored
+        mni_landmark_points_path: path to file containing the coordinates of the landmark points in MNI space
+        shift_scale_1: half the size of the cubic patches
+        resampled_bfc_tof_volume_sitk: resampled and bias-field-corrected sitk volume
+        lesion_coord: dict containing information about the lesions
+        landmark_patches_list: it contains the names of the folder containin landmark patches; if it's non-empty, it means that the landmark patches were already created
+    """
     if n == 1:
         patch_pair = 1
     elif n > 1:
@@ -684,15 +794,28 @@ def extract_neg_landmark_patches(neg_patches_path, sub, ses, n, tmp_folder, orig
         out_path = os.path.join(tmp_folder, "{}_{}_orig_tof_bfc.nii.gz".format(sub, ses))
         _, _, resampled_orig_angio_volume = resample_volume(original_angio_volume_path, desired_spacing, out_path)  # extract numpy array of original angio TOF
         # invoke function to extract patches in correspondence to anatomical landmark points recurrent for aneurysm occurrence
-        _ = extract_neg_patches_from_anatomical_landmarks(lesion_coord, resampled_orig_angio_volume, resampled_bfc_tof_aff_mat,
-                                                          registrations_dir, sub, ses, patch_pair, mni_landmark_points_path,
-                                                          shift_scale_1, neg_patches_path, resampled_bfc_tof_volume_sitk,
-                                                          tmp_folder, original_angio_volume_path)
+        _ = extract_neg_patches_from_anatomical_landmarks(lesion_coord,
+                                                          resampled_orig_angio_volume,
+                                                          resampled_bfc_tof_aff_mat,
+                                                          registrations_dir,
+                                                          sub,
+                                                          ses,
+                                                          patch_pair,
+                                                          mni_landmark_points_path,
+                                                          shift_scale_1,
+                                                          neg_patches_path,
+                                                          resampled_bfc_tof_volume_sitk,
+                                                          tmp_folder,
+                                                          original_angio_volume_path)
     else:
         print("Anatomical landmark patches already exist")
 
 
-def randomly_translate_coordinates(shift_, center_x, center_y, center_z, seed_):
+def randomly_translate_coordinates(shift_,
+                                   center_x,
+                                   center_y,
+                                   center_z,
+                                   seed_):
     """ This function takes as input the shift (i.e. number of voxels of which we want to translate our patch) and (x,y,z) which corresponds to the center of the patch.
     Then, if the lesion is not too big, it randomly shifts (x,y,z) of values which are in the range [-shift_; +shift_]. Then, it returns the shifted (x,y,z). If instead
     the lesion is too big, the function just returns the input coordinates untouched.
@@ -718,7 +841,13 @@ def randomly_translate_coordinates(shift_, center_x, center_y, center_z, seed_):
         return center_x, center_y, center_z  # just return non-translated coordinates
 
 
-def retrieve_intensity_conditions_one_sub(subdir, aneurysm_mask_path, data_path, new_spacing, patch_side, out_folder, overlapping):
+def retrieve_intensity_conditions_one_sub(subdir,
+                                          aneurysm_mask_path,
+                                          data_path,
+                                          new_spacing,
+                                          patch_side,
+                                          out_folder,
+                                          overlapping):
     """This function computes the intensity thresholds for extracting the vessel-like negative patches
     Args:
         subdir (str): path to parent folder of aneurysm_mask_path
@@ -793,7 +922,7 @@ def retrieve_intensity_conditions_one_sub(subdir, aneurysm_mask_path, data_path,
     out_path = os.path.join(tmp_folder, "resampled_vessel_atlas.nii.gz")
     _, _, vessel_mni_volume_resampled = resample_volume(vessel_mni_reg_volume_path, new_spacing, out_path)
 
-    lesion = (extract_lesion_info_modified(os.path.join(subdir, aneurysm_mask_path), tmp_folder, new_spacing, sub, ses))  # invoke external function and save dict with lesion information
+    lesion = (extract_lesion_info_from_resampled_mask_volume(os.path.join(subdir, aneurysm_mask_path), tmp_folder, new_spacing, sub, ses))  # invoke external function and save dict with lesion information
     sc_shift = lesion["widest_dimension"] // 2  # define Sanity Check shift (half side of widest lesion dimension)
     if sc_shift == 0:  # if the aneurysm is extremely tiny
         sc_shift = 1  # set at least a margin of 1 pixel
@@ -872,7 +1001,13 @@ def retrieve_intensity_conditions_one_sub(subdir, aneurysm_mask_path, data_path,
         return None  # if no positive patch was found, we return None (which we later remove), otherwise we degrade the precision of the distribution
 
 
-def extract_thresholds_of_intensity_criteria(data_path, patch_side, new_spacing, out_folder, n_parallel_jobs, overlapping, prints=True):
+def extract_thresholds_of_intensity_criteria(data_path,
+                                             patch_side,
+                                             new_spacing,
+                                             out_folder,
+                                             n_parallel_jobs,
+                                             overlapping,
+                                             prints=True):
     """This function computes the threshold to use for the extraction of the vessel-like negative patches (i.e. the
     negative patches that roughly have the same average intensity of the positive patches and include vessels)
     Args:
@@ -942,11 +1077,12 @@ def extract_thresholds_of_intensity_criteria(data_path, patch_side, new_spacing,
     return intensity_thresholds
 
 
-def refine_weak_label_one_sub(pos_path_path, masks_path):
+def refine_weak_label_one_sub(pos_path_path: str,
+                              masks_path: str) -> None:
     """ This function refines the mask of a positive patch: it removes the XX% percentile darkest voxels which most likely do not belong to the aneurysm
     Args:
-        pos_path_path (str): path to the positive patch to be refined
-        masks_path (str): path to the folder containing all the positive masks
+        pos_path_path: path to the positive patch to be refined
+        masks_path: path to the folder containing all the positive masks
     Raises:
         ValueError: if any of the masks is either non-binary or empty
         ValueError: if the newly created refined mask is either non-binary or empty
@@ -993,12 +1129,12 @@ def refine_weak_label_one_sub(pos_path_path, masks_path):
         raise ValueError("All white voxels were removed for {}".format(filename_mask))
 
 
-def load_pickle_list_from_disk(path_to_list: str) -> List:
+def load_pickle_list_from_disk(path_to_list: str) -> list:
     """This function loads a list from disk
     Args:
-        path_to_list (str): path to where the list is saved
+        path_to_list: path to where the list is saved
     Returns:
-        loaded_list (list): loaded list
+        loaded_list: loaded list
     Raises:
         AssertionError: if list path does not exist
         AssertionError: if extension is not .pkl
@@ -1013,15 +1149,17 @@ def load_pickle_list_from_disk(path_to_list: str) -> List:
     return loaded_list
 
 
-def create_bin_sphere(arr_size, center, radius):
+def create_bin_sphere(arr_size: tuple,
+                      center: np.ndarray,
+                      radius: float) -> np.ndarray:
     """This function creates a 3D binary volume which contains a sphere. It has value 1 inside the sphere and 0 around it.
     To obtain over-labelled spheres, we set "X*radius" when creating the output volume instead of just "radius" (e.g. 2*radius).
     Args:
-        arr_size (tuple): size of output 3D volume
-        center (np.ndarray): 3D coordinate of sphere center
-        radius (float): radius of the sphere in voxels
+        arr_size: size of output 3D volume
+        center: 3D coordinate of sphere center
+        radius: radius of the sphere in voxels
     Returns:
-        binary_output (np.ndarray): binary volume with 1 inside the sphere and 0 outside of it
+        binary_output: binary volume with 1 inside the sphere and 0 outside of it
     """
     assert len(arr_size) == 3, "This function is intended to work for 3D arrays"
     coords = np.ogrid[:arr_size[0], :arr_size[1], :arr_size[2]]  # type: list
@@ -1030,13 +1168,14 @@ def create_bin_sphere(arr_size, center, radius):
     return binary_output
 
 
-def extract_lesion_info(lesion_volume, prints=False):
+def extract_lesion_info(lesion_volume: np.ndarray,
+                        prints: bool = False) -> dict:
     """This function extracts the lesion info for a binary mask (e.g. the voxel center, the equivalent diameter, etc.)
     Args:
-        lesion_volume (np.ndarray): binary mask volume
-        prints (bool): if set to True, some information about the lesion is printed
+        lesion_volume: binary mask volume
+        prints: if set to True, some information about the lesion is printed
     Returns:
-        lesion_info (dict): it contains the relevant lesion information
+        lesion_info: it contains the relevant lesion information
     """
     lesion_info = {}  # initialize empty dict; this will be the output of the function
     if len(lesion_volume.shape) == 4:  # if the numpy array is not 3D
@@ -1087,7 +1226,8 @@ def extract_lesion_info(lesion_volume, prints=False):
     return lesion_info  # returns the dictionary with the lesion information
 
 
-def weakify_voxelwise_label_one_sub(pos_path_path, masks_path):
+def weakify_voxelwise_label_one_sub(pos_path_path: str,
+                                    masks_path: str) -> None:
     """This function converts the voxelwise mask of a positive patch into a weak mask: it creates a sphere around the aneurysm center
     Args:
         pos_path_path (str): path to the positive patch to be converted
