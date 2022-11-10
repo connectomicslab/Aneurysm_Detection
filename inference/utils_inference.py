@@ -315,13 +315,13 @@ def extract_thresholds_of_intensity_criteria(data_path: str,
                     all_files.append(file)
 
     assert all_subdirs and all_files, "Input lists must be non-empty"
-    out_list = Parallel(n_jobs=n_parallel_jobs, backend='loky')(delayed(retrieve_intensity_conditions_one_sub)(all_subdirs[idx],
-                                                                                                               all_files[idx],
-                                                                                                               data_path,
-                                                                                                               new_spacing,
-                                                                                                               patch_side,
-                                                                                                               out_folder,
-                                                                                                               overlapping) for idx in range(len(all_subdirs)))
+    out_list = Parallel(n_jobs=n_parallel_jobs, backend='threading')(delayed(retrieve_intensity_conditions_one_sub)(all_subdirs[idx],
+                                                                                                                    all_files[idx],
+                                                                                                                    data_path,
+                                                                                                                    new_spacing,
+                                                                                                                    patch_side,
+                                                                                                                    out_folder,
+                                                                                                                    overlapping) for idx in range(len(all_subdirs)))
 
     out_list = [x for x in out_list if x]  # remove None values from list if present
     out_list_np = np.asarray(out_list)  # type: np.ndarray # convert from list to numpy array
@@ -1846,13 +1846,13 @@ def extract_distance_thresholds(bids_ds_path: str,
                         all_files.append(file)
 
     assert all_subdirs and all_files, "Input lists must be non-empty"
-    out_list = Parallel(n_jobs=n_parallel_jobs, backend='loky')(delayed(extract_distance_one_aneurysm)(all_subdirs[idx],
-                                                                                                       all_files[idx],
-                                                                                                       bids_ds_path,
-                                                                                                       overlapping,
-                                                                                                       patch_side,
-                                                                                                       landmarks_physical_space_path,
-                                                                                                       out_dir) for idx in range(len(all_subdirs)))
+    out_list = Parallel(n_jobs=n_parallel_jobs, backend='threading')(delayed(extract_distance_one_aneurysm)(all_subdirs[idx],
+                                                                                                            threadingall_files[idx],
+                                                                                                            threadingbids_ds_path,
+                                                                                                            threadingoverlapping,
+                                                                                                            threadingpatch_side,
+                                                                                                            threadinglandmarks_physical_space_path,
+                                                                                                            out_dir) for idx in range(len(all_subdirs)))
     out_list = [x for x in out_list if x]  # remove None values from list if present
 
     out_list_np = np.asanyarray(out_list)  # convert list to numpy array
@@ -1945,9 +1945,9 @@ def extract_dark_fp_threshold(bids_dir: str,
                     all_files.append(file)
 
     assert all_subdirs and all_files, "Input lists must be non-empty"
-    out_list = Parallel(n_jobs=nb_parallel_jobs, backend='loky')(delayed(extract_dark_fp_threshold_one_aneurysm)(all_subdirs[idx],
-                                                                                                                 all_files[idx],
-                                                                                                                 bids_dir) for idx in range(len(all_subdirs)))
+    out_list = Parallel(n_jobs=nb_parallel_jobs, backend='threading')(delayed(extract_dark_fp_threshold_one_aneurysm)(all_subdirs[idx],
+                                                                                                                      all_files[idx],
+                                                                                                                      bids_dir) for idx in range(len(all_subdirs)))
     out_list = [x for x in out_list if x]  # remove None values from list if present
     dark_fp_threshold = min(out_list)  # in order to be conservative, take the min of the list
     return dark_fp_threshold
