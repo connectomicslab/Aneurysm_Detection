@@ -26,7 +26,7 @@ import pickle
 import argparse
 import json
 from typing import Tuple, Any
-from dataset_creation.utils_dataset_creation import retrieve_intensity_conditions_one_sub, extract_lesion_info, resample_volume, print_running_time
+from dataset_creation.utils_dataset_creation import extract_thresholds_of_intensity_criteria, extract_lesion_info, resample_volume, print_running_time
 from show_results.utils_show_results import sort_dict_by_value, round_half_up
 
 
@@ -153,90 +153,6 @@ def patch_overlaps_with_aneurysm(i: int,
         flag += 1  # increment flag; if it gets incremented, it means that the current candidate patch overlaps with one aneurysm with at least one voxel
 
     return flag
-
-
-def extract_thresholds_of_intensity_criteria(data_path: str,
-                                             sub_ses_test: list,
-                                             patch_side: int,
-                                             new_spacing: tuple,
-                                             out_folder: str,
-                                             n_parallel_jobs: int,
-                                             overlapping: float,
-                                             prints: bool = True) -> tuple:
-    """This function computes the threshold to use for the extraction of the vessel-like negative patches (i.e. the
-    negative patches that roughly have the same average intensity of the positive patches and include vessels)
-    Args:
-        data_path: path to BIDS dataset
-        sub_ses_test: sub_ses of the test set; we use it to take only the sub_ses of the training set
-        patch_side: side of cubic patches
-        new_spacing: desired voxel spacing
-        out_folder: path to output folder; during ds creation it is where we create the output dataset; at inference, it is where we save segmentation outputs
-        n_parallel_jobs: number of jobs to run in parallel
-        overlapping: amount of overlapping between patches in sliding-window approach
-        prints: whether to print numerical thresholds that were found; defaults to True
-    Returns:
-        intensity_thresholds: it contains the values to use for the extraction of the vessel-like negative patches
-                              (i.e. negative patches that have an overall intensity that resembles the one of positive patches)
-    """
-    regexp_sub = re.compile(r'sub')  # create a substring template to match
-    ext_gz = '.gz'  # type: str # set zipped files extension
-
-    # create new input lists to create positive patches in parallel
-    all_subdirs = []
-    all_files = []
-    for subdir, dirs, files in os.walk(data_path):
-        for file in files:
-            ext = os.path.splitext(file)[-1].lower()  # get the file extension
-            if regexp_sub.search(file) and ext == ext_gz and "Lesion" in file and "registrations" not in subdir and "Treated" not in file:
-                sub = re.findall(r"sub-\d+", subdir)[0]
-                ses = re.findall(r"ses-\w{6}\d+", subdir)[0]  # extract ses
-                sub_ses = "{}_{}".format(sub, ses)
-                if sub_ses not in sub_ses_test:  # only use training sub_ses otherwise we might introduce a bias towards the intensities of the aneurysms in the test set
-                    all_subdirs.append(subdir)
-                    all_files.append(file)
-
-    assert all_subdirs and all_files, "Input lists must be non-empty"
-    out_list = Parallel(n_jobs=n_parallel_jobs, backend='threading')(delayed(retrieve_intensity_conditions_one_sub)(all_subdirs[idx],
-                                                                                                                    all_files[idx],
-                                                                                                                    data_path,
-                                                                                                                    new_spacing,
-                                                                                                                    patch_side,
-                                                                                                                    out_folder,
-                                                                                                                    overlapping) for idx in range(len(all_subdirs)))
-
-    out_list = [x for x in out_list if x]  # remove None values from list if present
-    out_list_np = np.asarray(out_list)  # type: np.ndarray # convert from list to numpy array
-
-    q5_local_vessel_mni, q7_local_vessel_mni = np.percentile(out_list_np[:, 0], [5, 7])  # extract local intensity thresholds of vessel mni volume
-    q5_global_vessel_mni, q7_global_vessel_mni = np.percentile(out_list_np[:, 1], [5, 7])  # extract global intensity thresholds of vessel mni volume
-    q5_local_tof_bet, q7_local_tof_bet = np.percentile(out_list_np[:, 2], [5, 7])  # extract local intensity thresholds of tof-bet-n4bfc volume
-    q5_global_tof_bet, q7_global_tof_bet = np.percentile(out_list_np[:, 3], [5, 7])  # extract global intensity thresholds of tof-bet-n4bfc volume
-    q5_nz_vessel_mni = np.percentile(out_list_np[:, 4], [5])[0]  # extract threshold related to number of non-zero voxels in vessel-mni patch
-
-    if prints:
-        print("\nIntensity thresholds with patch_side={}".format(patch_side))
-        print("\nMean-Max local intensity ratio in vesselMNI positive patches:")
-        print("5th percentile = {}".format(q5_local_vessel_mni))
-        print("7th percentile = {}".format(q7_local_vessel_mni))
-
-        print("\nMean-Max global intensity ratio in vesselMNI positive patches:")
-        print("5th percentile = {}".format(q5_global_vessel_mni))
-        print("7th percentile = {}".format(q7_global_vessel_mni))
-
-        print("\nMean-Max local intensity ratio in bet TOF positive patches:")
-        print("5th percentile = {}".format(q5_local_tof_bet))
-        print("7th percentile = {}".format(q7_local_tof_bet))
-
-        print("\nMean-Max global intensity ratio in bet TOF positive patches:")
-        print("5th percentile = {}".format(q5_global_tof_bet))
-        print("7th percentile = {}".format(q7_global_tof_bet))
-
-        print("\nNumber of non-zero voxels in vesselMNI positive patches:")
-        print("5th percentile = {}".format(q5_nz_vessel_mni))
-
-    intensity_thresholds = (q5_local_vessel_mni, q5_global_vessel_mni, q5_local_tof_bet, q5_global_tof_bet, q5_nz_vessel_mni)
-
-    return intensity_thresholds
 
 
 def extract_reg_quality_metrics_one_sub(input_path: str) -> Tuple[float, float]:
@@ -1900,7 +1816,7 @@ def extract_thresholds_for_anatomically_informed(bids_dir: str,
     return reg_quality_metrics_threshold, intensity_thresholds, distances_thresholds, dark_fp_threshold
 
 
-def load_file_from_disk(file_path: str) -> str:
+def load_file_from_disk(file_path: str) -> Any:
     """This function loads a file from disk and returns it
     Args:
         file_path (str): path to file
