@@ -31,32 +31,30 @@ __email__ = "tommydino@hotmail.it"
 __status__ = "Prototype"
 
 
-def extract_negative_patches(subdir,
-                             n4bfc_bet_angio_path,
-                             bids_dataset_path,
-                             desired_spacing,
-                             out_dataset_path,
-                             mni_landmark_points_path,
-                             intensity_thresholds,
-                             extract_landmark_patches=True,
-                             nb_vessel_like_patches_per_sub=20,
-                             nb_random_patches_per_sub=0,
-                             patch_side=64):
+def extract_negative_patches(subdir: str,
+                             n4bfc_bet_angio_path: str,
+                             bids_dataset_path: str,
+                             desired_spacing: tuple,
+                             out_dataset_path: str,
+                             mni_landmark_points_path: str,
+                             intensity_thresholds: list,
+                             extract_landmark_patches: bool = True,
+                             nb_vessel_like_patches_per_sub: int = 20,
+                             nb_random_patches_per_sub: int = 0,
+                             patch_side: int = 64) -> None:
     """This function extracts negative patches from all subjects. For patients (subjects with aneurysm(s)), negative patches are only extracted if there is no overlap with an aneurysm
     Args:
-        subdir (str): path to parent folder of n4bfc_angio_bet
-        n4bfc_bet_angio_path (str): path to n4bfc_angio_bet volume
-        bids_dataset_path (str): path to BIDS dataset
-        desired_spacing (list): list containing the desired voxel spacing for resampling the input volumes
-        out_dataset_path (str): path to folder where we create the output dataset
-        mni_landmark_points_path (str): path to the csv file containing the landmark points coordinates
-        intensity_thresholds (list): it contains the threshold values to use in the extraction of the vessel-like negative patches
-        extract_landmark_patches (bool): if True, patches in correspondence of landmark points are extracted
-        nb_vessel_like_patches_per_sub (int): number of vessel-like negative patches to extract for each subject
-        nb_random_patches_per_sub (int): number of random negative patches to extract for each subject
-        patch_side (int): side of cubic patches that will be extracted (both negative and positive)
-    Returns:
-        None
+        subdir: path to parent folder of n4bfc_angio_bet
+        n4bfc_bet_angio_path: path to n4bfc_angio_bet volume
+        bids_dataset_path: path to BIDS dataset
+        desired_spacing: it contains the desired voxel spacing for resampling the input volumes
+        out_dataset_path: path to folder where we create the output dataset
+        mni_landmark_points_path: path to the csv file containing the landmark points coordinates
+        intensity_thresholds: it contains the threshold values to use in the extraction of the vessel-like negative patches
+        extract_landmark_patches: if True, patches in correspondence of landmark points are extracted
+        nb_vessel_like_patches_per_sub: number of vessel-like negative patches to extract for each subject
+        nb_random_patches_per_sub: number of random negative patches to extract for each subject
+        patch_side: side of cubic patches that will be extracted (both negative and positive)
     Raises:
         AssertionError: if bids_dataset_path does not exist
         AssertionError: if vessel_mni_registration_dir does not exist
@@ -181,24 +179,22 @@ def extract_negative_patches(subdir,
         shutil.rmtree(tmp_folder)
 
 
-def extract_positive_patches(subdir,
-                             aneurysm_mask_path,
-                             bids_dataset_path,
-                             desired_spacing,
-                             out_dataset_path,
-                             nb_pos_patches_per_sub=5,
-                             patch_side=64):
+def extract_positive_patches(subdir: str,
+                             aneurysm_mask_path: str,
+                             bids_dataset_path: str,
+                             desired_spacing: tuple,
+                             out_dataset_path: str,
+                             nb_pos_patches_per_sub: int = 5,
+                             patch_side: int = 64) -> None:
     """This function extracts positive patches for each patient (subject with aneurysm(s)). Positive patches are extracted as random shifts around the aneurysm center
     Args:
-        subdir (str): path to parent folder of aneurysm_mask_path
-        aneurysm_mask_path (str): path to aneurysm mask
-        bids_dataset_path (str): path to BIDS dataset
-        desired_spacing (list): list containing the desired voxel spacing for resampling the input volumes
-        out_dataset_path (str): path to folder where we create the output dataset
-        nb_pos_patches_per_sub (int): number of positive patches to extract for each patient; defaults to 5
-        patch_side (int): side of cubic patches that will be extracted; defaults to 64 (voxels)
-    Returns:
-        None
+        subdir: path to parent folder of aneurysm_mask_path
+        aneurysm_mask_path: path to aneurysm mask
+        bids_dataset_path: path to BIDS dataset
+        desired_spacing: list containing the desired voxel spacing for resampling the input volumes
+        out_dataset_path: path to folder where we create the output dataset
+        nb_pos_patches_per_sub: number of positive patches to extract for each patient; defaults to 5
+        patch_side: side of cubic patches that will be extracted; defaults to 64 (voxels)
     Raises:
         AssertionError: if BIDS dataset does not exits
         AssertionError: if folder containing bias-field-corrected volumes does not exist
@@ -373,43 +369,43 @@ def extract_positive_patches(subdir,
             shutil.rmtree(tmp_folder)
 
 
-def create_patch_ds(bids_dataset_path,
-                    mni_landmark_points_path,
-                    out_dataset_path,
-                    id_out_dataset,
-                    desired_spacing,
-                    vessel_like_neg_patches,
-                    random_neg_patches,
-                    landmark_patches,
-                    pos_patches,
-                    n_parallel_jobs,
-                    overlapping,
-                    subs_chuv_with_weak_labels_path,
-                    subs_chuv_with_voxelwise_labels_path,
-                    patch_side=64,
-                    refine_weak_labels=True,
-                    convert_voxelwise_labels_into_weak=False):
+def create_patch_ds(bids_dataset_path: str,
+                    mni_landmark_points_path: str,
+                    out_dataset_path: str,
+                    id_out_dataset: str,
+                    desired_spacing: tuple,
+                    vessel_like_neg_patches: int,
+                    random_neg_patches: int,
+                    landmark_patches: bool,
+                    pos_patches: int,
+                    n_parallel_jobs: int,
+                    overlapping: float,
+                    subs_chuv_with_weak_labels_path: str,
+                    subs_chuv_with_voxelwise_labels_path: str,
+                    sub_ses_test: list,
+                    patch_side: int = 64,
+                    refine_weak_labels: bool = True,
+                    convert_voxelwise_labels_into_weak: bool = False) -> None:
     """This function creates a dataset of patches starting from the 3D angio-TOF volume. For patients, it creates both
     positive (with aneurysm) and negative (without aneurysm) patches. For controls, it only creates negative patches.
     Args:
-        bids_dataset_path (str): path to BIDS dataset
-        mni_landmark_points_path (str): path to the csv file containing the landmark points coordinates
-        out_dataset_path (str): path to folder where we create the output dataset
-        id_out_dataset (str): unique identified for output folder where dataset will be created
-        desired_spacing (list): list containing the desired voxel spacing for resampling the input volumes
-        vessel_like_neg_patches (int): number of vessel-like negative patches to extract for each subject
-        random_neg_patches (int): number of random negative patches to extract for each subject
-        landmark_patches (bool): if True, patches in correspondence of landmark points are extracted
-        pos_patches (int): number of positive patches to extract for each patient (i.e. subject with aneurysm(s))
-        n_parallel_jobs (int): number of jobs to run in parallel
-        overlapping (float): amount of overlapping between patches in sliding-window approach
-        subs_chuv_with_weak_labels_path (str): path to list containing patients with weak labels
-        subs_chuv_with_voxelwise_labels_path (str): path to list containing patients with voxelwise labels
-        patch_side (int): side of cubic patches that will be extracted (both negative and positive)
-        refine_weak_labels (bool): if set to True, the weak labels are refined with an intensity criterion
-        convert_voxelwise_labels_into_weak (bool): if set to True, it converts the voxel-wise labels into weak (i.e. it generates synthetic spheres around the aneurysm center)
-    Returns:
-        None
+        bids_dataset_path: path to BIDS dataset
+        mni_landmark_points_path: path to the csv file containing the landmark points coordinates
+        out_dataset_path: path to folder where we create the output dataset
+        id_out_dataset: unique identified for output folder where dataset will be created
+        desired_spacing: list containing the desired voxel spacing for resampling the input volumes
+        vessel_like_neg_patches: number of vessel-like negative patches to extract for each subject
+        random_neg_patches: number of random negative patches to extract for each subject
+        landmark_patches: if True, patches in correspondence of landmark points are extracted
+        pos_patches: number of positive patches to extract for each patient (i.e. subject with aneurysm(s))
+        n_parallel_jobs: number of jobs to run in parallel
+        overlapping: amount of overlapping between patches in sliding-window approach
+        subs_chuv_with_weak_labels_path: path to list containing patients with weak labels
+        subs_chuv_with_voxelwise_labels_path: path to list containing patients with voxelwise labels
+        sub_ses_test: sub_ses of the test set; we use it to take only the sub_ses of the training set
+        patch_side: side of cubic patches that will be extracted (both negative and positive)
+        refine_weak_labels: if set to True, the weak labels are refined with an intensity criterion
+        convert_voxelwise_labels_into_weak: if set to True, it converts the voxel-wise labels into weak (i.e. it generates synthetic spheres around the aneurysm center)
     """
     # make sure all input paths exist
     assert os.path.exists(bids_dataset_path), "Path {} does not exist".format(bids_dataset_path)
@@ -426,11 +422,17 @@ def create_patch_ds(bids_dataset_path,
     random.seed(123)  # fix random seed such that the extraction is identical every time the script is run
 
     # ----------------------------------------- CREATE NEGATIVE PATCHES -----------------------------------------
-    intensity_thresholds = []  # type: list # initialize as empty; if we want to extract vessel-like neg patches, this will contain numerical thresholds
+    intensity_thresholds = ()  # type: tuple # initialize as empty; if we want to extract vessel-like neg patches, this will contain numerical thresholds
     if vessel_like_neg_patches > 0:  # if we will create the vessel-like negative patches
         # we must extract some numerical thresholds to use for extracting vessel-like negative patches (i.e. neg patches similar to positive ones)
         print("\nComputing intensity thresholds...")
-        intensity_thresholds = extract_thresholds_of_intensity_criteria(bids_dataset_path, patch_side, desired_spacing, out_dataset_path, n_parallel_jobs, overlapping)
+        intensity_thresholds = extract_thresholds_of_intensity_criteria(bids_dataset_path,
+                                                                        sub_ses_test,
+                                                                        patch_side,
+                                                                        desired_spacing,
+                                                                        out_dataset_path,
+                                                                        n_parallel_jobs,
+                                                                        overlapping)
         print("Done extracting intensity thresholds")
 
     # create input lists to create negative patches in parallel
@@ -548,7 +550,7 @@ def main():
     # extract input args
     bids_dataset_path = config_dict['bids_dataset_path']  # type: str # path to BIDS dataset (available on OpenNEURO)
     patch_side = config_dict['patch_side']  # type: int # size of training patches
-    desired_spacing = config_dict['desired_spacing']  # type: list # voxel spacing used for resampling (we resample all volumes to this spacing)
+    desired_spacing = tuple(config_dict['desired_spacing'])  # type: tuple # voxel spacing used for resampling (we resample all volumes to this spacing)
     overlapping = config_dict['overlapping']  # type: float # amount of overlapping between patches in sliding-window approach
     mni_landmark_points_path = config_dict['mni_landmark_points_path']  # type: str # path to file containining landmark points coordinates in physical space
     out_dataset_path = config_dict['out_dataset_path']  # type: str # path to output dataset
@@ -556,6 +558,7 @@ def main():
     subs_chuv_with_weak_labels_path = config_dict['subs_chuv_with_weak_labels_path']  # type: str # path to pickle file containin the subjects with weak labels
     subs_chuv_with_voxelwise_labels_path = config_dict['subs_chuv_with_voxelwise_labels_path']  # type: str  # path to pickle file containin the subjects with weak labels
     jobs_in_parallel = config_dict['jobs_in_parallel']  # type: int # nb. jobs to run in parallel (i.e. number of CPU (cores) to use); if set to -1, all available CPUs are used
+    sub_ses_test = config_dict['sub_ses_test']  # type: list
 
     # ARGS for negative patches
     vessel_like_neg_patches = config_dict['vessel_like_neg_patches']  # type: int # number of vessel-like negative patches to extract
@@ -580,6 +583,7 @@ def main():
                     overlapping,
                     subs_chuv_with_weak_labels_path,
                     subs_chuv_with_voxelwise_labels_path,
+                    sub_ses_test,
                     patch_side,
                     refine_weak_labels,
                     convert_voxelwise_labels_into_weak)
