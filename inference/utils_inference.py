@@ -109,6 +109,54 @@ def extract_registration_quality_metrics(bids_ds_path: str,
     return p3_neigh_corr_struct_2_tof, p97_mut_inf_struct_2_tof
 
 
+def patch_overlaps_with_aneurysm(i: int,
+                                 j: int,
+                                 k: int,
+                                 shift_scale_1: int,
+                                 x_min: int,
+                                 x_max: int,
+                                 y_min: int,
+                                 y_max: int,
+                                 z_min: int,
+                                 z_max) -> int:
+    """This function checks whether the patch centered at [i, j, k] overlaps with an aneurysm whose center is approximately located
+    at [np.mean([x_min, x_max]), np.mean([y_min, y_max]), np.mean([z_min, z_max])]
+    Args:
+        i: row center coordinate of the patch
+        j: column center coordinate of the patch
+        k: slice center coordinate of the patch
+        shift_scale_1: half side of cubic patches
+        x_min: conservative x_min coordinate from center of lesion
+        x_max: conservative x_max coordinate from center of lesion
+        y_min: conservative y_min coordinate from center of lesion
+        y_max: conservative y_max coordinate from center of lesion
+        z_min: conservative z_min coordinate from center of lesion
+        z_max: conservative z_max coordinate from center of lesion
+    Returns:
+        flag: if 0, there is no overlap between the patch and the aneurysm; if flag > 0, then there is overlap
+    """
+    flag = 0  # flag is just a dummy variable that we increment when a candidate patch overlaps with one aneurysm
+    # N.B. we check the overlap ONLY with the small-scale TOF patch cause the sequential scanning is performed with the small scale range
+    range_i = np.arange(i - shift_scale_1, i + shift_scale_1)  # create i range of the patch that will be evaluated
+    range_j = np.arange(j - shift_scale_1, j + shift_scale_1)  # create j range of the patch that will be evaluated
+    range_k = np.arange(k - shift_scale_1, k + shift_scale_1)  # create k range of the patch that will be evaluated
+
+    lesion_range_x = np.arange(x_min - 1, x_max + 1)  # create i range of the lesion (i.e. aneurysm)
+    lesion_range_y = np.arange(y_min - 1, y_max + 1)  # create j range of the lesion (i.e. aneurysm)
+    lesion_range_z = np.arange(z_min - 1, z_max + 1)  # create k range of the lesion (i.e. aneurysm)
+
+    # the boolean masks have all False if none of the voxels overlap (between candidate patch and lesion), and have True for the coordinates that do overlap
+    boolean_mask_x = (range_i >= np.min(lesion_range_x)) & (range_i <= np.max(lesion_range_x))
+    boolean_mask_y = (range_j >= np.min(lesion_range_y)) & (range_j <= np.max(lesion_range_y))
+    boolean_mask_z = (range_k >= np.min(lesion_range_z)) & (range_k <= np.max(lesion_range_z))
+
+    # if ALL the three boolean masks have at least one True value
+    if np.all(boolean_mask_y == False) == False and np.all(boolean_mask_x == False) == False and np.all(boolean_mask_z == False) == False:
+        flag += 1  # increment flag; if it gets incremented, it means that the current candidate patch overlaps with one aneurysm with at least one voxel
+
+    return flag
+
+
 def retrieve_intensity_conditions_one_sub(subdir: str,
                                           aneurysm_mask_path: str,
                                           data_path: str,
@@ -211,28 +259,21 @@ def retrieve_intensity_conditions_one_sub(subdir: str,
             for j in range(shift_scale_1, columns_range, step):  # loop over columns
                 for k in range(shift_scale_1, slices_range, step):  # loop over slices
 
-                    flag = 0  # flag is just a dummy variable that we increment when a candidate patch overlaps with one aneurysm
-                    # N.B. we check the overlap ONLY with the small-scale TOF patch cause the sequential scanning is performed with the small scale range
-                    range_i = np.arange(i - shift_scale_1, i + shift_scale_1)  # create x range of the patch that will be evaluated
-                    range_j = np.arange(j - shift_scale_1, j + shift_scale_1)  # create y range of the patch that will be evaluated
-                    range_k = np.arange(k - shift_scale_1, k + shift_scale_1)  # create z range of the patch that will be evaluated
-
-                    lesion_range_x = np.arange(x_min-1, x_max+1)  # create x range of the lesion (i.e. aneurysm)
-                    lesion_range_y = np.arange(y_min-1, y_max+1)  # create y range of the lesion (i.e. aneurysm)
-                    lesion_range_z = np.arange(z_min-1, z_max+1)  # create z range of the lesion (i.e. aneurysm)
-
-                    # the boolean masks have all False if none of the voxels overlap (between candidate patch and lesion), and have True for the coordinates that do overlap
-                    boolean_mask_x = (range_i >= np.min(lesion_range_x)) & (range_i <= np.max(lesion_range_x))
-                    boolean_mask_y = (range_j >= np.min(lesion_range_y)) & (range_j <= np.max(lesion_range_y))
-                    boolean_mask_z = (range_k >= np.min(lesion_range_z)) & (range_k <= np.max(lesion_range_z))
-
-                    # if ALL the three boolean masks have at least one True value
-                    if np.all(boolean_mask_y == False) == False and np.all(boolean_mask_x == False) == False and np.all(boolean_mask_z == False) == False:
-                        flag += 1  # increment flag; if it gets incremented, it means that the current candidate patch overlaps with one aneurysm with at least one voxel
+                    # if overlap_flag = 0, the patch does NOT overlap with the aneurysm; if overlap_flag > 0, there is overlap
+                    overlap_flag = patch_overlaps_with_aneurysm(i,
+                                                                j,
+                                                                k,
+                                                                shift_scale_1,
+                                                                x_min,
+                                                                x_max,
+                                                                y_min,
+                                                                y_max,
+                                                                z_min,
+                                                                z_max)
 
                     # ensure that the evaluated patch is not out of bound by using small scale
                     if i - shift_scale_1 >= 0 and i + shift_scale_1 < rows_range and j - shift_scale_1 >= 0 and j + shift_scale_1 < columns_range and k - shift_scale_1 >= 0 and k + shift_scale_1 < slices_range:
-                        if flag != 0:  # if the patch contains an aneurysm
+                        if overlap_flag != 0:  # if the patch contains an aneurysm
                             cnt_positive_patches += 1  # increment counter
                             # extract patch from angio after BET
                             angio_patch_after_bet_scale_1 = nii_volume_resampled[i - shift_scale_1:i + shift_scale_1,
@@ -294,8 +335,8 @@ def extract_thresholds_of_intensity_criteria(data_path: str,
         overlapping: amount of overlapping between patches in sliding-window approach
         prints: whether to print numerical thresholds that were found; defaults to True
     Returns:
-        intensity_thresholds (tuple): it contains the values to use for the extraction of the vessel-like negative patches
-                                      (i.e. negative patches that have an overall intensity that resembles the one of positive patches)
+        intensity_thresholds: it contains the values to use for the extraction of the vessel-like negative patches
+                              (i.e. negative patches that have an overall intensity that resembles the one of positive patches)
     """
     regexp_sub = re.compile(r'sub')  # create a substring template to match
     ext_gz = '.gz'  # type: str # set zipped files extension
@@ -1601,9 +1642,9 @@ def convert_mni_to_angio(df_landmarks: pd.DataFrame,
         struct_2_tof_mat_path: path to struct_2_TOF .mat file
         mni_2_struct_inverse_warp_path: path to mni_2_struct inverse warp field
     Returns:
-        df_landmark_points_tof_space (pd.Dataframe): it contains the physical (mm) coordinates of the landmark points warped to tof space
+        df_landmark_points_tof_physical_space: it contains the physical (mm) coordinates of the landmark points warped to tof space
     """
-    landmark_points_tof_space = []  # type: list # will contain the physical (mm) coordinates of the landmark points warped to tof space
+    landmark_points_tof_physical_space = []  # type: list # will contain the physical (mm) coordinates of the landmark points warped to tof space
     # loop over landmark points
     for _, coords in df_landmarks.iterrows():
         landmark_point_physical_space_mni = [coords["x"], coords["y"], coords["z"], 0]  # add 0 in the time variable, because ANTs requires the coordinates to be in the shape [x, y, z, t] in physical space
@@ -1657,15 +1698,15 @@ def convert_mni_to_angio(df_landmarks: pd.DataFrame,
         df_tof_landmark_coords = pd.read_csv(output_path_tof)
         landmark_mm_coord_tof = list(df_tof_landmark_coords.iloc[0])[:-1]  # extract first row of pd dataframe, convert to list and remove last item (t), cause we don't care about it
 
-        landmark_points_tof_space.append(landmark_mm_coord_tof)
+        landmark_points_tof_physical_space.append(landmark_mm_coord_tof)
 
         # UNCOMMENT lines below for DEBUGGING
         # landmark_voxel_coord_tof = bfc_angio_volume_sitk.TransformPhysicalPointToIndex(landmark_mm_coord_tof)
         # print("DEBUG: landmark TOF voxel coord = {}".format(landmark_voxel_coord_tof))
 
-    df_landmark_points_tof_space = pd.DataFrame(landmark_points_tof_space, columns=["x", "y", "z"])  # type: pd.DataFrame # convert from list to dataframe
+    df_landmark_points_tof_physical_space = pd.DataFrame(landmark_points_tof_physical_space, columns=["x", "y", "z"])  # type: pd.DataFrame # convert from list to dataframe
 
-    return df_landmark_points_tof_space
+    return df_landmark_points_tof_physical_space
 
 
 def extract_distance_one_aneurysm(subdir: str,
@@ -1751,28 +1792,22 @@ def extract_distance_one_aneurysm(subdir: str,
         for i in range(shift_scale_1, rows_range, step):  # loop over rows
             for j in range(shift_scale_1, columns_range, step):  # loop over columns
                 for k in range(shift_scale_1, slices_range, step):  # loop over slices
-                    flag = 0  # flag is just a dummy variable that we increment when a candidate patch overlaps with one aneurysm
-                    # N.B. we check the overlap ONLY with the small-scale TOF patch cause the sequential scanning is performed with the small scale range
-                    range_i = np.arange(i - shift_scale_1, i + shift_scale_1)  # create i range of the patch that will be evaluated
-                    range_j = np.arange(j - shift_scale_1, j + shift_scale_1)  # create j range of the patch that will be evaluated
-                    range_k = np.arange(k - shift_scale_1, k + shift_scale_1)  # create k range of the patch that will be evaluated
 
-                    lesion_range_x = np.arange(x_min-1, x_max+1)  # create i range of the lesion (i.e. aneurysm)
-                    lesion_range_y = np.arange(y_min-1, y_max+1)  # create j range of the lesion (i.e. aneurysm)
-                    lesion_range_z = np.arange(z_min-1, z_max+1)  # create k range of the lesion (i.e. aneurysm)
-
-                    # the boolean masks have all False if none of the voxels overlap (between candidate patch and lesion), and have True for the coordinates that do overlap
-                    boolean_mask_x = (range_i >= np.min(lesion_range_x)) & (range_i <= np.max(lesion_range_x))
-                    boolean_mask_y = (range_j >= np.min(lesion_range_y)) & (range_j <= np.max(lesion_range_y))
-                    boolean_mask_z = (range_k >= np.min(lesion_range_z)) & (range_k <= np.max(lesion_range_z))
-
-                    # if ALL the three boolean masks have at least one True value
-                    if np.all(boolean_mask_y == False) == False and np.all(boolean_mask_x == False) == False and np.all(boolean_mask_z == False) == False:
-                        flag += 1  # increment flag; if it gets incremented, it means that the current candidate patch overlaps with one aneurysm with at least one voxel
+                    # if overlap_flag = 0, the patch does NOT overlap with the aneurysm; if overlap_flag > 0, there is overlap
+                    overlap_flag = patch_overlaps_with_aneurysm(i,
+                                                                j,
+                                                                k,
+                                                                shift_scale_1,
+                                                                x_min,
+                                                                x_max,
+                                                                y_min,
+                                                                y_max,
+                                                                z_min,
+                                                                z_max)
 
                     # ensure that the evaluated patch is not out of bound by using small scale
                     if i - shift_scale_1 >= 0 and i + shift_scale_1 < rows_range and j - shift_scale_1 >= 0 and j + shift_scale_1 < columns_range and k - shift_scale_1 >= 0 and k + shift_scale_1 < slices_range:
-                        if flag != 0:  # if the patch contains an aneurysm
+                        if overlap_flag != 0:  # if the patch contains an aneurysm
                             cnt_positive_patches += 1  # increment counter
 
                             # convert patch center from voxel to physical space (mm)
@@ -1847,11 +1882,11 @@ def extract_distance_thresholds(bids_ds_path: str,
 
     assert all_subdirs and all_files, "Input lists must be non-empty"
     out_list = Parallel(n_jobs=n_parallel_jobs, backend='threading')(delayed(extract_distance_one_aneurysm)(all_subdirs[idx],
-                                                                                                            threadingall_files[idx],
-                                                                                                            threadingbids_ds_path,
-                                                                                                            threadingoverlapping,
-                                                                                                            threadingpatch_side,
-                                                                                                            threadinglandmarks_physical_space_path,
+                                                                                                            all_files[idx],
+                                                                                                            bids_ds_path,
+                                                                                                            overlapping,
+                                                                                                            patch_side,
+                                                                                                            landmarks_physical_space_path,
                                                                                                             out_dir) for idx in range(len(all_subdirs)))
     out_list = [x for x in out_list if x]  # remove None values from list if present
 
