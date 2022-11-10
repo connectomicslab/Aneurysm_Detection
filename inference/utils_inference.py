@@ -26,7 +26,8 @@ import pickle
 import argparse
 import json
 from typing import Tuple, Any
-from dataset_creation.utils_dataset_creation import extract_thresholds_of_intensity_criteria, extract_lesion_info, resample_volume, print_running_time
+from dataset_creation.utils_dataset_creation import extract_thresholds_of_intensity_criteria, extract_lesion_info,\
+    resample_volume, print_running_time, patch_overlaps_with_aneurysm, create_dir_if_not_exist
 from show_results.utils_show_results import sort_dict_by_value, round_half_up
 
 
@@ -34,15 +35,6 @@ __author__ = "Tommaso Di Noto"
 __version__ = "0.0.1"
 __email__ = "tommydino@hotmail.it"
 __status__ = "Prototype"
-
-
-def create_dir_if_not_exist(dir_to_create: str) -> None:
-    """This function creates the input dir if it doesn't exist.
-    Args:
-        dir_to_create: directory that we want to create
-    """
-    if not os.path.exists(dir_to_create):  # if dir doesn't exist
-        os.makedirs(dir_to_create)  # create it
 
 
 def create_input_lists(bids_dir: str) -> Tuple[list, list]:
@@ -105,54 +97,6 @@ def extract_registration_quality_metrics(bids_ds_path: str,
     p97_mut_inf_struct_2_tof = np.percentile(all_struct_2_tof_mutual_inf, [97])[0]
 
     return p3_neigh_corr_struct_2_tof, p97_mut_inf_struct_2_tof
-
-
-def patch_overlaps_with_aneurysm(i: int,
-                                 j: int,
-                                 k: int,
-                                 shift_scale_1: int,
-                                 x_min: int,
-                                 x_max: int,
-                                 y_min: int,
-                                 y_max: int,
-                                 z_min: int,
-                                 z_max) -> int:
-    """This function checks whether the patch centered at [i, j, k] overlaps with an aneurysm whose center is approximately located
-    at [np.mean([x_min, x_max]), np.mean([y_min, y_max]), np.mean([z_min, z_max])]
-    Args:
-        i: row center coordinate of the patch
-        j: column center coordinate of the patch
-        k: slice center coordinate of the patch
-        shift_scale_1: half side of cubic patches
-        x_min: conservative x_min coordinate from center of lesion
-        x_max: conservative x_max coordinate from center of lesion
-        y_min: conservative y_min coordinate from center of lesion
-        y_max: conservative y_max coordinate from center of lesion
-        z_min: conservative z_min coordinate from center of lesion
-        z_max: conservative z_max coordinate from center of lesion
-    Returns:
-        flag: if 0, there is no overlap between the patch and the aneurysm; if flag > 0, then there is overlap
-    """
-    flag = 0  # flag is just a dummy variable that we increment when a candidate patch overlaps with one aneurysm
-    # N.B. we check the overlap ONLY with the small-scale TOF patch cause the sequential scanning is performed with the small scale range
-    range_i = np.arange(i - shift_scale_1, i + shift_scale_1)  # create i range of the patch that will be evaluated
-    range_j = np.arange(j - shift_scale_1, j + shift_scale_1)  # create j range of the patch that will be evaluated
-    range_k = np.arange(k - shift_scale_1, k + shift_scale_1)  # create k range of the patch that will be evaluated
-
-    lesion_range_x = np.arange(x_min - 1, x_max + 1)  # create i range of the lesion (i.e. aneurysm)
-    lesion_range_y = np.arange(y_min - 1, y_max + 1)  # create j range of the lesion (i.e. aneurysm)
-    lesion_range_z = np.arange(z_min - 1, z_max + 1)  # create k range of the lesion (i.e. aneurysm)
-
-    # the boolean masks have all False if none of the voxels overlap (between candidate patch and lesion), and have True for the coordinates that do overlap
-    boolean_mask_x = (range_i >= np.min(lesion_range_x)) & (range_i <= np.max(lesion_range_x))
-    boolean_mask_y = (range_j >= np.min(lesion_range_y)) & (range_j <= np.max(lesion_range_y))
-    boolean_mask_z = (range_k >= np.min(lesion_range_z)) & (range_k <= np.max(lesion_range_z))
-
-    # if ALL the three boolean masks have at least one True value
-    if np.all(boolean_mask_y == False) == False and np.all(boolean_mask_x == False) == False and np.all(boolean_mask_z == False) == False:
-        flag += 1  # increment flag; if it gets incremented, it means that the current candidate patch overlaps with one aneurysm with at least one voxel
-
-    return flag
 
 
 def extract_reg_quality_metrics_one_sub(input_path: str) -> Tuple[float, float]:
