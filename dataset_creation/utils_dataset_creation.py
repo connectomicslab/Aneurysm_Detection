@@ -22,8 +22,9 @@ import re
 from joblib import Parallel, delayed
 import shutil
 import pickle
-from typing import Tuple
+from typing import Tuple, Any
 from show_results.utils_show_results import round_half_up
+from inference.utils_inference import create_dir_if_not_exist, patch_overlaps_with_aneurysm
 
 
 __author__ = "Tommaso Di Noto"
@@ -51,7 +52,7 @@ def print_running_time(start_time: float,
 
 
 def resample_volume(volume_path: str,
-                    new_spacing: list,
+                    new_spacing: tuple,
                     out_path: str,
                     interpolator: int = sitk.sitkLinear) -> Tuple[sitk.Image, nib.Nifti1Image, np.ndarray]:
     """This function resamples the input volume to a specified voxel spacing
@@ -87,7 +88,7 @@ def resample_volume(volume_path: str,
 
 
 def load_resampled_vol_and_boundaries(volume_path: str,
-                                      new_spacing_: list,
+                                      new_spacing_: tuple,
                                       tmp_folder_: str,
                                       sub_: str,
                                       ses_: str) -> Tuple[np.ndarray, np.ndarray, sitk.Image, int, int, int, int, int, int]:
@@ -126,7 +127,7 @@ def load_resampled_vol_and_boundaries(volume_path: str,
 def load_nifti_and_resample(volume_path: str,
                             tmp_folder_: str,
                             out_name: str,
-                            new_spacing_: list,
+                            new_spacing_: tuple,
                             binary_mask: bool = False) -> Tuple[nib.Nifti1Image, np.ndarray, np.ndarray]:
     """This function loads a nifti volume, resamples it to a specified voxel spacing, and returns both
     the resampled nifti object and the resampled volume as numpy array, together with the affine matrix
@@ -153,7 +154,7 @@ def load_nifti_and_resample(volume_path: str,
 
 def extract_lesion_info_from_resampled_mask_volume(path_to_lesion: str,
                                                    tmp_folder: str,
-                                                   new_spacing: list,
+                                                   new_spacing: tuple,
                                                    sub_: str,
                                                    ses_: str,
                                                    prints: bool = False) -> dict:
@@ -763,7 +764,7 @@ def extract_neg_landmark_patches(neg_patches_path: str,
                                  n: int,
                                  tmp_folder: str,
                                  original_angio_volume_path: str,
-                                 desired_spacing: list,
+                                 desired_spacing: tuple,
                                  resampled_bfc_tof_aff_mat: np.ndarray,
                                  registrations_dir: str,
                                  mni_landmark_points_path: str,
@@ -847,24 +848,24 @@ def randomly_translate_coordinates(shift_,
         return center_x, center_y, center_z  # just return non-translated coordinates
 
 
-def retrieve_intensity_conditions_one_sub(subdir,
-                                          aneurysm_mask_path,
-                                          data_path,
-                                          new_spacing,
-                                          patch_side,
-                                          out_folder,
-                                          overlapping):
+def retrieve_intensity_conditions_one_sub(subdir: str,
+                                          aneurysm_mask_path: str,
+                                          data_path: str,
+                                          new_spacing: tuple,
+                                          patch_side: int,
+                                          out_folder: str,
+                                          overlapping: float) -> Any:
     """This function computes the intensity thresholds for extracting the vessel-like negative patches
     Args:
-        subdir (str): path to parent folder of aneurysm_mask_path
-        aneurysm_mask_path (str): path to aneurysm mask
-        data_path (str): path to BIDS dataset
-        new_spacing (list): desired voxel spacing to which we want to resample
-        patch_side (int): side of cubic patches that will be created
-        out_folder (str): path to output folder; during ds creation it is where we create the output dataset; at inference, it is where we save segmentation outputs
-        overlapping (float): amount of overlapping between patches in sliding-window approach
+        subdir: path to parent folder of aneurysm_mask_path
+        aneurysm_mask_path: path to aneurysm mask
+        data_path: path to BIDS dataset
+        new_spacing: desired voxel spacing to which we want to resample
+        patch_side: side of cubic patches that will be created
+        out_folder: path to output folder; during ds creation it is where we create the output dataset; at inference, it is where we save segmentation outputs
+        overlapping: amount of overlapping between patches in sliding-window approach
     Returns:
-        out_list (list): it contains values of interest from which we will draw the final thresholds; if no positive patch was evaluated, we return None
+        out_list: it contains values of interest from which we will draw the final thresholds; if no positive patch was evaluated, we return None
     Raises:
         AssertionError: if the BIDS dataset path does not exist
         AssertionError: if the folder containing the vesselMNI deformed volume does not exist
@@ -873,11 +874,11 @@ def retrieve_intensity_conditions_one_sub(subdir,
         AssertionError: if the session (i.e. exam date) was not found
         AssertionError: if the lesion name was not found
     """
-    assert os.path.exists(data_path), "path {} does not exist".format(data_path)
+    assert os.path.exists(data_path), "Path {} does not exist".format(data_path)
     vessel_mni_registration_dir = os.path.join(data_path, "derivatives", "registrations", "vesselMNI_2_angioTOF")
-    assert os.path.exists(vessel_mni_registration_dir), "path {} does not exist".format(vessel_mni_registration_dir)  # make sure that path exists
+    assert os.path.exists(vessel_mni_registration_dir), "Path {} does not exist".format(vessel_mni_registration_dir)  # make sure that path exists
     bfc_derivatives_dir = os.path.join(data_path, "derivatives", "N4_bias_field_corrected")
-    assert os.path.exists(bfc_derivatives_dir), "path {} does not exist".format(bfc_derivatives_dir)  # make sure that path exists
+    assert os.path.exists(bfc_derivatives_dir), "Path {} does not exist".format(bfc_derivatives_dir)  # make sure that path exists
 
     shift_scale_1 = patch_side // 2
 
@@ -894,138 +895,139 @@ def retrieve_intensity_conditions_one_sub(subdir,
         lesion_name = re.findall(r"Treated_Lesion_\d+", aneurysm_mask_path)[0]  # type: str # extract lesion name
     else:
         lesion_name = re.findall(r"Lesion_\d+", aneurysm_mask_path)[0]  # type: str # extract lesion name
+
     assert len(sub) != 0, "Subject ID not found"
     assert len(ses) != 0, "Session number not found"
     assert len(lesion_name) != 0, "Lesion name not found"
 
-    # create unique tmp folder where we save temporary files (this folder will be deleted at the end)
-    tmp_folder = os.path.join(out_folder, "tmp_{}_{}_{}_pos_patches".format(sub, ses, lesion_name))
-    if not os.path.exists(tmp_folder):
-        os.makedirs(tmp_folder)
+    # if we are NOT dealing with a treated aneurysm
+    if "Treated" not in lesion_name:
 
-    print("{}-{}-{}".format(sub, ses, lesion_name))
+        # create unique tmp folder where we save temporary files (this folder will be deleted at the end)
+        tmp_folder = os.path.join(out_folder, "tmp_{}_{}_{}_pos_patches".format(sub, ses, lesion_name))
+        create_dir_if_not_exist(tmp_folder)  # if directory does not exist, create it
 
-    # save path of corresponding vesselMNI co-registered volume
-    if "ADAM" in subdir:
-        vessel_mni_reg_volume_path = os.path.join(vessel_mni_registration_dir, sub, ses, "anat", "{}_{}_desc-vesselMNI2angio_deformed_ADAM.nii.gz".format(sub, ses))
-    else:
-        vessel_mni_reg_volume_path = os.path.join(vessel_mni_registration_dir, sub, ses, "anat", "{}_{}_desc-vesselMNI2angio_deformed.nii.gz".format(sub, ses))
-    assert os.path.exists(vessel_mni_reg_volume_path), "Path {} does not exist".format(vessel_mni_reg_volume_path)  # make sure path exists
+        # uncomment line below for debugging
+        # print("{}-{}-{}".format(sub, ses, lesion_name))
 
-    if "ADAM" in subdir:
-        bet_angio_bfc_path = os.path.join(bfc_derivatives_dir, sub, ses, "anat", "{}_{}_desc-angio_N4bfc_brain_mask_ADAM.nii.gz".format(sub, ses))  # type: str # save path of angio brain after Brain Extraction Tool (BET)
-    else:
-        bet_angio_bfc_path = os.path.join(bfc_derivatives_dir, sub, ses, "anat", "{}_{}_desc-angio_N4bfc_brain_mask.nii.gz".format(sub, ses))  # type: str # save path of angio brain after Brain Extraction Tool (BET)
+        # save path of corresponding vesselMNI co-registered volume
+        if "ADAM" in subdir:
+            vessel_mni_reg_volume_path = os.path.join(vessel_mni_registration_dir, sub, ses, "anat", "{}_{}_desc-vesselMNI2angio_deformed_ADAM.nii.gz".format(sub, ses))
+        else:
+            vessel_mni_reg_volume_path = os.path.join(vessel_mni_registration_dir, sub, ses, "anat", "{}_{}_desc-vesselMNI2angio_deformed.nii.gz".format(sub, ses))
+        assert os.path.exists(vessel_mni_reg_volume_path), "Path {} does not exist".format(vessel_mni_reg_volume_path)
 
-    assert os.path.exists(bet_angio_bfc_path), "path {} does not exist".format(bet_angio_bfc_path)  # make sure that path exists
+        # save path of corresponding brain-extracted and N4 bias-field-corrected tof-angio volume
+        if "ADAM" in subdir:
+            bet_angio_bfc_path = os.path.join(bfc_derivatives_dir, sub, ses, "anat", "{}_{}_desc-angio_N4bfc_brain_mask_ADAM.nii.gz".format(sub, ses))  # type: str # save path of angio brain after Brain Extraction Tool (BET)
+        else:
+            bet_angio_bfc_path = os.path.join(bfc_derivatives_dir, sub, ses, "anat", "{}_{}_desc-angio_N4bfc_brain_mask.nii.gz".format(sub, ses))  # type: str # save path of angio brain after Brain Extraction Tool (BET)
+        assert os.path.exists(bet_angio_bfc_path), "Path {} does not exist".format(bet_angio_bfc_path)  # make sure that path exists
 
-    # Load N4 bias-field-corrected angio volume after BET and resample to new spacing
-    out_path = os.path.join(tmp_folder, "resampled_bet_tof_bfc.nii.gz")
-    _, _, nii_volume_resampled = resample_volume(bet_angio_bfc_path, new_spacing, out_path)
-    rows_range, columns_range, slices_range = nii_volume_resampled.shape  # save dimensions of resampled angio-BET volume
+        # Load N4 bias-field-corrected angio volume after BET and resample to new spacing
+        out_path = os.path.join(tmp_folder, "resampled_bet_tof_bfc.nii.gz")
+        _, _, nii_volume_resampled = resample_volume(bet_angio_bfc_path, new_spacing, out_path)
+        rows_range, columns_range, slices_range = nii_volume_resampled.shape  # save dimensions of resampled angio-BET volume
 
-    # Load corresponding vesselMNI volume and resample to new spacing
-    out_path = os.path.join(tmp_folder, "resampled_vessel_atlas.nii.gz")
-    _, _, vessel_mni_volume_resampled = resample_volume(vessel_mni_reg_volume_path, new_spacing, out_path)
+        # Load corresponding vesselMNI volume and resample to new spacing
+        out_path = os.path.join(tmp_folder, "resampled_vessel_atlas.nii.gz")
+        _, _, vessel_mni_volume_resampled = resample_volume(vessel_mni_reg_volume_path, new_spacing, out_path)
 
-    lesion = (extract_lesion_info_from_resampled_mask_volume(os.path.join(subdir, aneurysm_mask_path), tmp_folder, new_spacing, sub, ses))  # invoke external function and save dict with lesion information
-    sc_shift = lesion["widest_dimension"] // 2  # define Sanity Check shift (half side of widest lesion dimension)
-    if sc_shift == 0:  # if the aneurysm is extremely tiny
-        sc_shift = 1  # set at least a margin of 1 pixel
-    # N.B. I INVERT X and Y BECAUSE of OpenCV (see https://stackoverflow.com/a/56849032/9492673)
-    x_center = lesion["centroid_y_coord"]  # extract y coordinate of lesion centroid
-    y_center = lesion["centroid_x_coord"]  # extract x coordinate of lesion centroid
-    z_central = lesion["idx_slice_with_more_white_pixels"]  # extract idx of slice with more non-zero pixels
-    x_min, x_max = x_center - sc_shift, x_center + sc_shift  # compute safest (largest) min and max x of patch containing lesion
-    y_min, y_max = y_center - sc_shift, y_center + sc_shift  # compute safest (largest) min and max y of patch containing lesion
-    z_min, z_max = z_central - sc_shift, z_central + sc_shift  # compute safest (largest) min and max z of patch containing lesion
+        lesion = (extract_lesion_info_from_resampled_mask_volume(os.path.join(subdir, aneurysm_mask_path), tmp_folder, new_spacing, sub, ses))  # invoke external function and save dict with lesion information
+        sc_shift = lesion["widest_dimension"] // 2  # define Sanity Check shift (half side of widest lesion dimension)
+        # N.B. I INVERT X and Y BECAUSE of OpenCV (see https://stackoverflow.com/a/56849032/9492673)
+        x_center = lesion["centroid_y_coord"]  # extract y coordinate of lesion centroid
+        y_center = lesion["centroid_x_coord"]  # extract x coordinate of lesion centroid
+        z_central = lesion["idx_slice_with_more_white_pixels"]  # extract idx of slice with more non-zero pixels
+        x_min, x_max = x_center - sc_shift, x_center + sc_shift  # compute safest (largest) min and max x of patch containing lesion
+        y_min, y_max = y_center - sc_shift, y_center + sc_shift  # compute safest (largest) min and max y of patch containing lesion
+        z_min, z_max = z_central - sc_shift, z_central + sc_shift  # compute safest (largest) min and max z of patch containing lesion
+        # lesion_coord[aneur_path] = [x_min, x_max, y_min, y_max, z_min, z_max]  # save lesion information in external dict
 
-    lesion_range_x = np.arange(x_min, x_max)  # create x range of the lesion (i.e. aneurysm)
-    lesion_range_y = np.arange(y_min, y_max)  # create y range of the lesion (i.e. aneurysm)
-    lesion_range_z = np.arange(z_min, z_max)  # create z range of the lesion (i.e. aneurysm)
+        cnt_positive_patches = 0  # type: int # counter to keep track of how many pos patches are selected for each patient
+        step = int(round_half_up((1 - overlapping) * patch_side))  # type: int
+        for i in range(shift_scale_1, rows_range, step):  # loop over rows
+            for j in range(shift_scale_1, columns_range, step):  # loop over columns
+                for k in range(shift_scale_1, slices_range, step):  # loop over slices
 
-    cnt_positive_patches = 0  # type: int # counter to keep track of how many pos patches are selected for each patient
-    step = int(round_half_up((1 - overlapping) * patch_side))  # type: int
-    for x in range(shift_scale_1, rows_range, step):  # loop over rows
-        for y in range(shift_scale_1, columns_range, step):  # loop over columns
-            for z in range(shift_scale_1, slices_range, step):  # loop over slices
+                    # if overlap_flag = 0, the patch does NOT overlap with the aneurysm; if overlap_flag > 0, there is overlap
+                    overlap_flag = patch_overlaps_with_aneurysm(i,
+                                                                j,
+                                                                k,
+                                                                shift_scale_1,
+                                                                x_min,
+                                                                x_max,
+                                                                y_min,
+                                                                y_max,
+                                                                z_min,
+                                                                z_max)
 
-                flag = 0  # flag is just a dummy variable that we increment when a candidate patch overlaps with one aneurysm
-                # N.B. we check the overlap ONLY with the small-scale TOF patch cause the sequential scanning is performed with the small scale range
-                range_x = np.arange(x - shift_scale_1, x + shift_scale_1)  # create x range of the patch that will be evaluated
-                range_y = np.arange(y - shift_scale_1, y + shift_scale_1)  # create y range of the patch that will be evaluated
-                range_z = np.arange(z - shift_scale_1, z + shift_scale_1)  # create z range of the patch that will be evaluated
+                    # ensure that the evaluated patch is not out of bound by using small scale
+                    if i - shift_scale_1 >= 0 and i + shift_scale_1 < rows_range and j - shift_scale_1 >= 0 and j + shift_scale_1 < columns_range and k - shift_scale_1 >= 0 and k + shift_scale_1 < slices_range:
+                        if overlap_flag != 0:  # if the patch contains an aneurysm
+                            cnt_positive_patches += 1  # increment counter
+                            # extract patch from angio after BET
+                            angio_patch_after_bet_scale_1 = nii_volume_resampled[i - shift_scale_1:i + shift_scale_1,
+                                                                                 j - shift_scale_1:j + shift_scale_1,
+                                                                                 k - shift_scale_1:k + shift_scale_1]
 
-                # the boolean masks have all False if none of the voxels overlap (between candidate patch and lesion), and have True for the coordinates that do overlap
-                boolean_mask_x = (range_x >= np.min(lesion_range_x)) & (range_x <= np.max(lesion_range_x))
-                boolean_mask_y = (range_y >= np.min(lesion_range_y)) & (range_y <= np.max(lesion_range_y))
-                boolean_mask_z = (range_z >= np.min(lesion_range_z)) & (range_z <= np.max(lesion_range_z))
+                            # extract small-scale patch from vesselMNI volume; we don't need the big-scale vessel patch
+                            vessel_mni_patch = vessel_mni_volume_resampled[i - shift_scale_1:i + shift_scale_1,
+                                                                           j - shift_scale_1:j + shift_scale_1,
+                                                                           k - shift_scale_1:k + shift_scale_1]
 
-                # if ALL the three boolean masks have at least one True value
-                if np.all(boolean_mask_x == False) == False and np.all(boolean_mask_y == False) == False and np.all(boolean_mask_z == False) == False:
-                    flag += 1  # increment flag; if it gets incremented, it means that the current candidate patch overlaps with one aneurysm with at least one voxel
+                            # if mean and max intensities are not "nan" and the translated patch doesn't have more zeros than the centered one
+                            if not math.isnan(np.mean(vessel_mni_patch)) and not math.isnan(np.max(vessel_mni_patch)) and not math.isnan(np.max(vessel_mni_volume_resampled)) \
+                                    and np.max(vessel_mni_patch) != 0 and not math.isnan(np.mean(angio_patch_after_bet_scale_1)) and np.max(angio_patch_after_bet_scale_1) != 0:
+                                ratio_local_vessel_mni = np.mean(vessel_mni_patch) / np.max(vessel_mni_patch)  # compute intensity ratio (mean/max) only on vesselMNI patch
+                                ratio_global_vessel_mni = np.mean(vessel_mni_patch) / np.max(vessel_mni_volume_resampled)  # compute intensity ratio (mean/max) on vesselMNI patch wrt entire volume
+                                ratio_local_tof_bet = np.mean(angio_patch_after_bet_scale_1) / np.max(angio_patch_after_bet_scale_1)  # compute local intensity ratio (mean/max) on bet_tof
+                                ratio_global_tof_bet = np.mean(angio_patch_after_bet_scale_1) / np.max(nii_volume_resampled)  # compute global intensity ratio (mean/max) on bet_tof
 
-                # ensure that the evaluated patch is not out of bound by using small scale
-                if x - shift_scale_1 >= 0 and x + shift_scale_1 < rows_range and y - shift_scale_1 >= 0 and y + shift_scale_1 < columns_range and z - shift_scale_1 >= 0 and z + shift_scale_1 < slices_range:
-                    if flag != 0:  # if the patch contains an aneurysm
-                        cnt_positive_patches += 1  # increment counter
-                        # extract patch from angio after BET
-                        angio_patch_after_bet_scale_1 = nii_volume_resampled[x - shift_scale_1:x + shift_scale_1,
-                                                                             y - shift_scale_1:y + shift_scale_1,
-                                                                             z - shift_scale_1:z + shift_scale_1]
+                                ratios_local_vessel_mni.append(ratio_local_vessel_mni)
+                                ratios_global_vessel_mni.append(ratio_global_vessel_mni)
+                                ratios_local_tof_bet_bfc.append(ratio_local_tof_bet)
+                                ratios_global_tof_bet_bfc.append(ratio_global_tof_bet)
+                                non_zeros_vessel_mni.append(np.count_nonzero(vessel_mni_patch))
 
-                        # extract small-scale patch from vesselMNI volume; we don't need the big-scale vessel patch
-                        vessel_mni_patch = vessel_mni_volume_resampled[x - shift_scale_1:x + shift_scale_1,
-                                                                       y - shift_scale_1:y + shift_scale_1,
-                                                                       z - shift_scale_1:z + shift_scale_1]
+        if cnt_positive_patches == 0:
+            print("WARNING: no positive patch evaluated for {}_{}_{}; we are looping over patients with aneurysm(s)".format(sub, ses, lesion_name))
+        # -------------------------------------------------------------------------------------
+        # remove temporary folder for this subject
+        if os.path.exists(tmp_folder) and os.path.isdir(tmp_folder):
+            shutil.rmtree(tmp_folder)
 
-                        # if mean and max intensities are not "nan" and the translated patch doesn't have more zeros than the centered one
-                        if not math.isnan(np.mean(vessel_mni_patch)) and not math.isnan(np.max(vessel_mni_patch)) and not math.isnan(np.max(vessel_mni_volume_resampled)) \
-                                and np.max(vessel_mni_patch) != 0 and not math.isnan(np.mean(angio_patch_after_bet_scale_1)) and np.max(angio_patch_after_bet_scale_1) != 0:
-                            ratio_local_vessel_mni = np.mean(vessel_mni_patch) / np.max(vessel_mni_patch)  # compute intensity ratio (mean/max) only on vesselMNI patch
-                            ratio_global_vessel_mni = np.mean(vessel_mni_patch) / np.max(vessel_mni_volume_resampled)  # compute intensity ratio (mean/max) on vesselMNI patch wrt entire volume
-                            ratio_local_tof_bet = np.mean(angio_patch_after_bet_scale_1) / np.max(angio_patch_after_bet_scale_1)  # compute local intensity ratio (mean/max) on bet_tof
-                            ratio_global_tof_bet = np.mean(angio_patch_after_bet_scale_1) / np.max(nii_volume_resampled)  # compute global intensity ratio (mean/max) on bet_tof
-
-                            ratios_local_vessel_mni.append(ratio_local_vessel_mni)
-                            ratios_global_vessel_mni.append(ratio_global_vessel_mni)
-                            ratios_local_tof_bet_bfc.append(ratio_local_tof_bet)
-                            ratios_global_tof_bet_bfc.append(ratio_global_tof_bet)
-                            non_zeros_vessel_mni.append(np.count_nonzero(vessel_mni_patch))
-
-    if cnt_positive_patches == 0:
-        print("WARNING: no positive patch evaluated for {}_{}_{}; we are looping over patients with aneurysm(s)".format(sub, ses, lesion_name))
-    # -------------------------------------------------------------------------------------
-    # remove temporary folder for this subject
-    if os.path.exists(tmp_folder) and os.path.isdir(tmp_folder):
-        shutil.rmtree(tmp_folder)
-
-    if cnt_positive_patches > 0:
-        out_list = [np.median(ratios_local_vessel_mni), np.median(ratios_global_vessel_mni), np.median(ratios_local_tof_bet_bfc), np.median(ratios_global_tof_bet_bfc), np.median(non_zeros_vessel_mni)]
-        return out_list
-    else:
-        return None  # if no positive patch was found, we return None (which we later remove), otherwise we degrade the precision of the distribution
+        if cnt_positive_patches > 0:  # usually, there are multiple positive patches per aneurysm because of the sliding-window
+            out_list = [np.median(ratios_local_vessel_mni), np.median(ratios_global_vessel_mni), np.median(ratios_local_tof_bet_bfc), np.median(ratios_global_tof_bet_bfc), np.median(non_zeros_vessel_mni)]
+            return out_list
+        else:
+            return None  # if no positive patch was found, we return None (which we later remove), otherwise we degrade the precision of the distribution
+    else:  # if it's a treated aneurysm
+        return None
 
 
-def extract_thresholds_of_intensity_criteria(data_path,
-                                             patch_side,
-                                             new_spacing,
-                                             out_folder,
-                                             n_parallel_jobs,
-                                             overlapping,
-                                             prints=True):
+def extract_thresholds_of_intensity_criteria(data_path: str,
+                                             sub_ses_test: list,
+                                             patch_side: int,
+                                             new_spacing: tuple,
+                                             out_folder: str,
+                                             n_parallel_jobs: int,
+                                             overlapping: float,
+                                             prints: bool = True) -> tuple:
     """This function computes the threshold to use for the extraction of the vessel-like negative patches (i.e. the
     negative patches that roughly have the same average intensity of the positive patches and include vessels)
     Args:
-        data_path (str): path to BIDS dataset
-        patch_side (int): side of cubic patches
-        new_spacing (list): desired voxel spacing
-        out_folder (str): path to output folder; during ds creation it is where we create the output dataset; at inference, it is where we save segmentation outputs
-        n_parallel_jobs (int): number of jobs to run in parallel
-        overlapping (float): amount of overlapping between patches in sliding-window approach
-        prints (bool): whether to print numerical thresholds that were found; defaults to True
+        data_path: path to BIDS dataset
+        sub_ses_test: sub_ses of the test set; we use it to take only the sub_ses of the training set
+        patch_side: side of cubic patches
+        new_spacing: desired voxel spacing
+        out_folder: path to output folder; during ds creation it is where we create the output dataset; at inference, it is where we save segmentation outputs
+        n_parallel_jobs: number of jobs to run in parallel
+        overlapping: amount of overlapping between patches in sliding-window approach
+        prints: whether to print numerical thresholds that were found; defaults to True
     Returns:
-        intensity_thresholds (list): it contains the values to use for the extraction of the vessel-like negative samples
+        intensity_thresholds: it contains the values to use for the extraction of the vessel-like negative patches
+                              (i.e. negative patches that have an overall intensity that resembles the one of positive patches)
     """
     regexp_sub = re.compile(r'sub')  # create a substring template to match
     ext_gz = '.gz'  # type: str # set zipped files extension
@@ -1036,29 +1038,34 @@ def extract_thresholds_of_intensity_criteria(data_path,
     for subdir, dirs, files in os.walk(data_path):
         for file in files:
             ext = os.path.splitext(file)[-1].lower()  # get the file extension
-            if regexp_sub.search(file) and ext == ext_gz and "Lesion" in file and "registrations" not in subdir:
-                all_subdirs.append(subdir)
-                all_files.append(file)
+            if regexp_sub.search(file) and ext == ext_gz and "Lesion" in file and "registrations" not in subdir and "Treated" not in file:
+                sub = re.findall(r"sub-\d+", subdir)[0]
+                ses = re.findall(r"ses-\w{6}\d+", subdir)[0]  # extract ses
+                sub_ses = "{}_{}".format(sub, ses)
+                if sub_ses not in sub_ses_test:  # only use training sub_ses otherwise we might introduce a bias towards the intensities of the aneurysms in the test set
+                    all_subdirs.append(subdir)
+                    all_files.append(file)
 
     assert all_subdirs and all_files, "Input lists must be non-empty"
-    out_list = Parallel(n_jobs=n_parallel_jobs, backend='loky')(delayed(retrieve_intensity_conditions_one_sub)(all_subdirs[idx],
-                                                                                                               all_files[idx],
-                                                                                                               data_path,
-                                                                                                               new_spacing,
-                                                                                                               patch_side,
-                                                                                                               out_folder,
-                                                                                                               overlapping) for idx in range(len(all_subdirs)))
+    out_list = Parallel(n_jobs=n_parallel_jobs, backend='threading')(delayed(retrieve_intensity_conditions_one_sub)(all_subdirs[idx],
+                                                                                                                    all_files[idx],
+                                                                                                                    data_path,
+                                                                                                                    new_spacing,
+                                                                                                                    patch_side,
+                                                                                                                    out_folder,
+                                                                                                                    overlapping) for idx in range(len(all_subdirs)))
 
-    out_list = [x for x in out_list if x]  # remove None values from list
+    out_list = [x for x in out_list if x]  # remove None values from list if present
     out_list_np = np.asarray(out_list)  # type: np.ndarray # convert from list to numpy array
 
-    q5_local_vessel_mni, q7_local_vessel_mni = np.percentile(out_list_np[:, 0], [5, 7])
-    q5_global_vessel_mni, q7_global_vessel_mni = np.percentile(out_list_np[:, 1], [5, 7])
-    q5_local_tof_bet, q7_local_tof_bet = np.percentile(out_list_np[:, 2], [5, 7])
-    q5_global_tof_bet, q7_global_tof_bet = np.percentile(out_list_np[:, 3], [5, 7])
-    q5_nz_vessel_mni = np.percentile(out_list_np[:, 4], [5])
+    q5_local_vessel_mni, q7_local_vessel_mni = np.percentile(out_list_np[:, 0], [5, 7])  # extract local intensity thresholds of vessel mni volume
+    q5_global_vessel_mni, q7_global_vessel_mni = np.percentile(out_list_np[:, 1], [5, 7])  # extract global intensity thresholds of vessel mni volume
+    q5_local_tof_bet, q7_local_tof_bet = np.percentile(out_list_np[:, 2], [5, 7])  # extract local intensity thresholds of tof-bet-n4bfc volume
+    q5_global_tof_bet, q7_global_tof_bet = np.percentile(out_list_np[:, 3], [5, 7])  # extract global intensity thresholds of tof-bet-n4bfc volume
+    q5_nz_vessel_mni = np.percentile(out_list_np[:, 4], [5])[0]  # extract threshold related to number of non-zero voxels in vessel-mni patch
 
     if prints:
+        print("\nIntensity thresholds with patch_side={}".format(patch_side))
         print("\nMean-Max local intensity ratio in vesselMNI positive patches:")
         print("5th percentile = {}".format(q5_local_vessel_mni))
         print("7th percentile = {}".format(q7_local_vessel_mni))
@@ -1078,7 +1085,7 @@ def extract_thresholds_of_intensity_criteria(data_path,
         print("\nNumber of non-zero voxels in vesselMNI positive patches:")
         print("5th percentile = {}".format(q5_nz_vessel_mni))
 
-    intensity_thresholds = [q5_local_vessel_mni, q5_global_vessel_mni, q5_local_tof_bet, q5_global_tof_bet, q5_nz_vessel_mni]
+    intensity_thresholds = (q5_local_vessel_mni, q5_global_vessel_mni, q5_local_tof_bet, q5_global_tof_bet, q5_nz_vessel_mni)
 
     return intensity_thresholds
 
