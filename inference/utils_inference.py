@@ -22,13 +22,11 @@ import re
 import scipy.spatial
 from joblib import Parallel, delayed
 import shutil
-from skimage.measure import regionprops
-import cv2
 import pickle
 import argparse
 import json
 from typing import Tuple, Any
-from dataset_creation.utils_dataset_creation import extract_lesion_info_from_resampled_mask_volume, extract_lesion_info, resample_volume, print_running_time
+from dataset_creation.utils_dataset_creation import retrieve_intensity_conditions_one_sub, extract_lesion_info, resample_volume, print_running_time
 from show_results.utils_show_results import sort_dict_by_value, round_half_up
 
 
@@ -157,168 +155,10 @@ def patch_overlaps_with_aneurysm(i: int,
     return flag
 
 
-def retrieve_intensity_conditions_one_sub(subdir: str,
-                                          aneurysm_mask_path: str,
-                                          data_path: str,
-                                          new_spacing: list,
-                                          patch_side: int,
-                                          out_folder: str,
-                                          overlapping: float) -> Any:
-    """This function computes the intensity thresholds for extracting the vessel-like negative patches
-    Args:
-        subdir: path to parent folder of aneurysm_mask_path
-        aneurysm_mask_path: path to aneurysm mask
-        data_path: path to BIDS dataset
-        new_spacing: desired voxel spacing to which we want to resample
-        patch_side: side of cubic patches that will be created
-        out_folder: path to output folder; during ds creation it is where we create the output dataset; at inference, it is where we save segmentation outputs
-        overlapping: amount of overlapping between patches in sliding-window approach
-    Returns:
-        out_list: it contains values of interest from which we will draw the final thresholds; if no positive patch was evaluated, we return None
-    Raises:
-        AssertionError: if the BIDS dataset path does not exist
-        AssertionError: if the folder containing the vesselMNI deformed volume does not exist
-        AssertionError: if the folder containing the bias-field-corrected volumes does not exist
-        AssertionError: if the sub ID was not found
-        AssertionError: if the session (i.e. exam date) was not found
-        AssertionError: if the lesion name was not found
-    """
-    assert os.path.exists(data_path), "Path {} does not exist".format(data_path)
-    vessel_mni_registration_dir = os.path.join(data_path, "derivatives", "registrations", "vesselMNI_2_angioTOF")
-    assert os.path.exists(vessel_mni_registration_dir), "Path {} does not exist".format(vessel_mni_registration_dir)  # make sure that path exists
-    bfc_derivatives_dir = os.path.join(data_path, "derivatives", "N4_bias_field_corrected")
-    assert os.path.exists(bfc_derivatives_dir), "Path {} does not exist".format(bfc_derivatives_dir)  # make sure that path exists
-
-    shift_scale_1 = patch_side // 2
-
-    ratios_local_vessel_mni = []
-    ratios_global_vessel_mni = []
-    ratios_local_tof_bet_bfc = []
-    ratios_global_tof_bet_bfc = []
-    non_zeros_vessel_mni = []
-
-    sub = re.findall(r"sub-\d+", subdir)[0]
-    ses = re.findall(r"ses-\w{6}\d+", subdir)[0]  # extract ses
-
-    if "Treated" in aneurysm_mask_path:
-        lesion_name = re.findall(r"Treated_Lesion_\d+", aneurysm_mask_path)[0]  # type: str # extract lesion name
-    else:
-        lesion_name = re.findall(r"Lesion_\d+", aneurysm_mask_path)[0]  # type: str # extract lesion name
-
-    assert len(sub) != 0, "Subject ID not found"
-    assert len(ses) != 0, "Session number not found"
-    assert len(lesion_name) != 0, "Lesion name not found"
-
-    # if we are NOT dealing with a treated aneurysm
-    if "Treated" not in lesion_name:
-
-        # create unique tmp folder where we save temporary files (this folder will be deleted at the end)
-        tmp_folder = os.path.join(out_folder, "tmp_{}_{}_{}_pos_patches".format(sub, ses, lesion_name))
-        create_dir_if_not_exist(tmp_folder)  # if directory does not exist, create it
-
-        # uncomment line below for debugging
-        # print("{}-{}-{}".format(sub, ses, lesion_name))
-
-        # save path of corresponding vesselMNI co-registered volume
-        if "ADAM" in subdir:
-            vessel_mni_reg_volume_path = os.path.join(vessel_mni_registration_dir, sub, ses, "anat", "{}_{}_desc-vesselMNI2angio_deformed_ADAM.nii.gz".format(sub, ses))
-        else:
-            vessel_mni_reg_volume_path = os.path.join(vessel_mni_registration_dir, sub, ses, "anat", "{}_{}_desc-vesselMNI2angio_deformed.nii.gz".format(sub, ses))
-        assert os.path.exists(vessel_mni_reg_volume_path), "Path {} does not exist".format(vessel_mni_reg_volume_path)
-
-        # save path of corresponding brain-extracted and N4 bias-field-corrected tof-angio volume
-        if "ADAM" in subdir:
-            bet_angio_bfc_path = os.path.join(bfc_derivatives_dir, sub, ses, "anat", "{}_{}_desc-angio_N4bfc_brain_mask_ADAM.nii.gz".format(sub, ses))  # type: str # save path of angio brain after Brain Extraction Tool (BET)
-        else:
-            bet_angio_bfc_path = os.path.join(bfc_derivatives_dir, sub, ses, "anat", "{}_{}_desc-angio_N4bfc_brain_mask.nii.gz".format(sub, ses))  # type: str # save path of angio brain after Brain Extraction Tool (BET)
-        assert os.path.exists(bet_angio_bfc_path), "Path {} does not exist".format(bet_angio_bfc_path)  # make sure that path exists
-
-        # Load N4 bias-field-corrected angio volume after BET and resample to new spacing
-        out_path = os.path.join(tmp_folder, "resampled_bet_tof_bfc.nii.gz")
-        _, _, nii_volume_resampled = resample_volume(bet_angio_bfc_path, new_spacing, out_path)
-        rows_range, columns_range, slices_range = nii_volume_resampled.shape  # save dimensions of resampled angio-BET volume
-
-        # Load corresponding vesselMNI volume and resample to new spacing
-        out_path = os.path.join(tmp_folder, "resampled_vessel_atlas.nii.gz")
-        _, _, vessel_mni_volume_resampled = resample_volume(vessel_mni_reg_volume_path, new_spacing, out_path)
-
-        lesion = (extract_lesion_info_from_resampled_mask_volume(os.path.join(subdir, aneurysm_mask_path), tmp_folder, new_spacing, sub, ses))  # invoke external function and save dict with lesion information
-        sc_shift = lesion["widest_dimension"] // 2  # define Sanity Check shift (half side of widest lesion dimension)
-        # N.B. I INVERT X and Y BECAUSE of OpenCV (see https://stackoverflow.com/a/56849032/9492673)
-        x_center = lesion["centroid_y_coord"]  # extract y coordinate of lesion centroid
-        y_center = lesion["centroid_x_coord"]  # extract x coordinate of lesion centroid
-        z_central = lesion["idx_slice_with_more_white_pixels"]  # extract idx of slice with more non-zero pixels
-        x_min, x_max = x_center - sc_shift, x_center + sc_shift  # compute safest (largest) min and max x of patch containing lesion
-        y_min, y_max = y_center - sc_shift, y_center + sc_shift  # compute safest (largest) min and max y of patch containing lesion
-        z_min, z_max = z_central - sc_shift, z_central + sc_shift  # compute safest (largest) min and max z of patch containing lesion
-        # lesion_coord[aneur_path] = [x_min, x_max, y_min, y_max, z_min, z_max]  # save lesion information in external dict
-
-        cnt_positive_patches = 0  # type: int # counter to keep track of how many pos patches are selected for each patient
-        step = int(round_half_up((1 - overlapping) * patch_side))  # type: int
-        for i in range(shift_scale_1, rows_range, step):  # loop over rows
-            for j in range(shift_scale_1, columns_range, step):  # loop over columns
-                for k in range(shift_scale_1, slices_range, step):  # loop over slices
-
-                    # if overlap_flag = 0, the patch does NOT overlap with the aneurysm; if overlap_flag > 0, there is overlap
-                    overlap_flag = patch_overlaps_with_aneurysm(i,
-                                                                j,
-                                                                k,
-                                                                shift_scale_1,
-                                                                x_min,
-                                                                x_max,
-                                                                y_min,
-                                                                y_max,
-                                                                z_min,
-                                                                z_max)
-
-                    # ensure that the evaluated patch is not out of bound by using small scale
-                    if i - shift_scale_1 >= 0 and i + shift_scale_1 < rows_range and j - shift_scale_1 >= 0 and j + shift_scale_1 < columns_range and k - shift_scale_1 >= 0 and k + shift_scale_1 < slices_range:
-                        if overlap_flag != 0:  # if the patch contains an aneurysm
-                            cnt_positive_patches += 1  # increment counter
-                            # extract patch from angio after BET
-                            angio_patch_after_bet_scale_1 = nii_volume_resampled[i - shift_scale_1:i + shift_scale_1,
-                                                                                 j - shift_scale_1:j + shift_scale_1,
-                                                                                 k - shift_scale_1:k + shift_scale_1]
-
-                            # extract small-scale patch from vesselMNI volume; we don't need the big-scale vessel patch
-                            vessel_mni_patch = vessel_mni_volume_resampled[i - shift_scale_1:i + shift_scale_1,
-                                                                           j - shift_scale_1:j + shift_scale_1,
-                                                                           k - shift_scale_1:k + shift_scale_1]
-
-                            # if mean and max intensities are not "nan" and the translated patch doesn't have more zeros than the centered one
-                            if not math.isnan(np.mean(vessel_mni_patch)) and not math.isnan(np.max(vessel_mni_patch)) and not math.isnan(np.max(vessel_mni_volume_resampled)) \
-                                    and np.max(vessel_mni_patch) != 0 and not math.isnan(np.mean(angio_patch_after_bet_scale_1)) and np.max(angio_patch_after_bet_scale_1) != 0:
-                                ratio_local_vessel_mni = np.mean(vessel_mni_patch) / np.max(vessel_mni_patch)  # compute intensity ratio (mean/max) only on vesselMNI patch
-                                ratio_global_vessel_mni = np.mean(vessel_mni_patch) / np.max(vessel_mni_volume_resampled)  # compute intensity ratio (mean/max) on vesselMNI patch wrt entire volume
-                                ratio_local_tof_bet = np.mean(angio_patch_after_bet_scale_1) / np.max(angio_patch_after_bet_scale_1)  # compute local intensity ratio (mean/max) on bet_tof
-                                ratio_global_tof_bet = np.mean(angio_patch_after_bet_scale_1) / np.max(nii_volume_resampled)  # compute global intensity ratio (mean/max) on bet_tof
-
-                                ratios_local_vessel_mni.append(ratio_local_vessel_mni)
-                                ratios_global_vessel_mni.append(ratio_global_vessel_mni)
-                                ratios_local_tof_bet_bfc.append(ratio_local_tof_bet)
-                                ratios_global_tof_bet_bfc.append(ratio_global_tof_bet)
-                                non_zeros_vessel_mni.append(np.count_nonzero(vessel_mni_patch))
-
-        if cnt_positive_patches == 0:
-            print("WARNING: no positive patch evaluated for {}_{}_{}; we are looping over patients with aneurysm(s)".format(sub, ses, lesion_name))
-        # -------------------------------------------------------------------------------------
-        # remove temporary folder for this subject
-        if os.path.exists(tmp_folder) and os.path.isdir(tmp_folder):
-            shutil.rmtree(tmp_folder)
-
-        if cnt_positive_patches > 0:  # usually, there are multiple positive patches per aneurysm because of the sliding-window
-            out_list = [np.median(ratios_local_vessel_mni), np.median(ratios_global_vessel_mni), np.median(ratios_local_tof_bet_bfc), np.median(ratios_global_tof_bet_bfc), np.median(non_zeros_vessel_mni)]
-            return out_list
-        else:
-            return None  # if no positive patch was found, we return None (which we later remove), otherwise we degrade the precision of the distribution
-    else:  # if it's a treated aneurysm
-        return None
-
-
 def extract_thresholds_of_intensity_criteria(data_path: str,
                                              sub_ses_test: list,
                                              patch_side: int,
-                                             new_spacing: list,
+                                             new_spacing: tuple,
                                              out_folder: str,
                                              n_parallel_jobs: int,
                                              overlapping: float,
@@ -475,7 +315,7 @@ def retrieve_registration_params(registration_dir_: str) -> Tuple[str, str, str,
 def load_nifti_and_resample(volume_path: str,
                             tmp_folder_: str,
                             out_name: str,
-                            new_spacing_: list,
+                            new_spacing_: tuple,
                             binary_mask: bool = False) -> Tuple[sitk.Image, nib.Nifti1Image, np.ndarray, np.ndarray]:
     """This function loads a nifti volume, resamples it to a specified voxel spacing, and returns both
     the resampled nifti object and the resampled volume as numpy array, together with the affine matrix
@@ -792,7 +632,7 @@ def reduce_fp_in_segm_map(txt_file_path: str,
 
 
 def resample_volume_inverse(volume_path: str,
-                            new_spacing: list,
+                            new_spacing: tuple,
                             new_size: list,
                             out_path: str,
                             interpolator: int = sitk.sitkLinear) -> Tuple[sitk.Image, nib.Nifti1Image, np.ndarray]:
@@ -1097,7 +937,7 @@ def save_output_mask_and_output_location(segm_map_resampled: np.ndarray,
     save_volume_mask_to_disk(segm_map_resampled, output_folder_path_, aff_mat_resampled, out_filename, output_dtype="float32")
 
     # extract voxel spacing of original (i.e. non-resampled) angio volume
-    original_spacing = list(orig_bfc_angio_sitk.GetSpacing())
+    original_spacing = orig_bfc_angio_sitk.GetSpacing()  # type: tuple
     # extract size of original (i.e. non-resampled) angio volume
     original_size = list(orig_bfc_angio_sitk.GetSize())
     # create output file for registration
@@ -1991,7 +1831,7 @@ def extract_dark_fp_threshold(bids_dir: str,
 def extract_thresholds_for_anatomically_informed(bids_dir: str,
                                                  sub_ses_test: list,
                                                  unet_patch_side: int,
-                                                 new_spacing: list,
+                                                 new_spacing: tuple,
                                                  inference_outputs_path: str,
                                                  nb_parallel_jobs: int,
                                                  overlapping: float,
@@ -2094,7 +1934,7 @@ def save_sliding_window_mask_to_disk(sliding_window_mask_volume: np.ndarray,
     save_volume_mask_to_disk(sliding_window_mask_volume, output_folder_path_, aff_mat_resampled, out_filename, output_dtype="int32")
 
     # extract voxel spacing of original (i.e. non-resampled) angio volume
-    original_spacing = list(orig_bfc_angio_sitk.GetSpacing())
+    original_spacing = orig_bfc_angio_sitk.GetSpacing()  # type: tuple
     # extract size of original (i.e. non-resampled) angio volume
     original_size = list(orig_bfc_angio_sitk.GetSize())
     # create output file for registration
@@ -2139,44 +1979,44 @@ def check_output_consistency_between_detection_and_segmentation(output_folder: s
             print("\nWARNING for {}_{}: there shouldn't be any connected component; found {} instead".format(sub, ses, numb_labels))
 
 
-def sanity_check_inputs(unet_patch_side,
-                        unet_batch_size,
-                        unet_threshold,
-                        overlapping,
-                        new_spacing,
-                        conv_filters,
-                        cv_folds,
-                        anatomically_informed_sliding_window,
-                        test_time_augmentation,
-                        reduce_fp,
-                        max_fp,
-                        reduce_fp_with_volume,
-                        min_aneurysm_volume,
-                        remove_dark_fp,
-                        bids_dir,
-                        training_outputs_path,
-                        landmarks_physical_space_path,
-                        ground_truth_dir) -> None:
+def sanity_check_inputs(unet_patch_side: int,
+                        unet_batch_size: int,
+                        unet_threshold: float,
+                        overlapping: float,
+                        new_spacing: tuple,
+                        conv_filters: tuple,
+                        cv_folds: int,
+                        anatomically_informed_sliding_window: bool,
+                        test_time_augmentation: bool,
+                        reduce_fp: bool,
+                        max_fp: int,
+                        reduce_fp_with_volume: bool,
+                        min_aneurysm_volume: float,
+                        remove_dark_fp: bool,
+                        bids_dir: str,
+                        training_outputs_path: str,
+                        landmarks_physical_space_path: str,
+                        ground_truth_dir: str) -> None:
     """This function runs some sanity checks on the inputs of the sliding-window.
     Args:
-        unet_patch_side (int): patch side of cubic patches
-        unet_batch_size (int): batch size to use (not really relevant since we are doing inference, but still needed)
-        unet_threshold (float): # threshold used to binarize the probabilistic U-Net's prediction
-        overlapping (float): rate of overlapping to use during the sliding-window; defaults to 0
-        new_spacing (list): it contains the desired voxel spacing to which we will resample
-        conv_filters (tuple): it contains the number of filters in the convolutional layers
-        cv_folds (int): number of cross-validation folds
-        anatomically_informed_sliding_window (bool): whether to perform the anatomically-informed sliding-window
-        test_time_augmentation (bool): whether to perform test time augmentation
-        reduce_fp (bool): if set to True, only the "max_fp" most probable candidate aneurysm are retained; defaults to True
-        max_fp (int): maximum number of allowed FPs per subject. If the U-Net predicts more than these, only the MAX_FP most probable are retained
-        reduce_fp_with_volume (bool): if set to True, only the candidate lesions that have a volume (mm^3) > than a specific threshold are retained; defaults to True
-        min_aneurysm_volume (float): minimum aneurysm volume; below this value we discard the candidate predictions
-        remove_dark_fp (bool): if set to True, candidate aneurysms that are not brighter than a certain threshold (on average) are discarded; defaults to True
-        bids_dir (str): path to BIDS dataset
-        training_outputs_path (str): path to folder where we stored the weights of the network at the end of training
-        landmarks_physical_space_path (str): path to file containing the coordinates of the landmark points
-        ground_truth_dir (str): path to directory containing the ground truth masks and location files
+        unet_patch_side: patch side of cubic patches
+        unet_batch_size: batch size to use (not really relevant since we are doing inference, but still needed)
+        unet_threshold: # threshold used to binarize the probabilistic U-Net's prediction
+        overlapping: rate of overlapping to use during the sliding-window; defaults to 0
+        new_spacing: it contains the desired voxel spacing to which we will resample
+        conv_filters: it contains the number of filters in the convolutional layers
+        cv_folds: number of cross-validation folds
+        anatomically_informed_sliding_window: whether to perform the anatomically-informed sliding-window
+        test_time_augmentation: whether to perform test time augmentation
+        reduce_fp: if set to True, only the "max_fp" most probable candidate aneurysm are retained; defaults to True
+        max_fp: maximum number of allowed FPs per subject. If the U-Net predicts more than these, only the MAX_FP most probable are retained
+        reduce_fp_with_volume: if set to True, only the candidate lesions that have a volume (mm^3) > than a specific threshold are retained; defaults to True
+        min_aneurysm_volume: minimum aneurysm volume; below this value we discard the candidate predictions
+        remove_dark_fp: if set to True, candidate aneurysms that are not brighter than a certain threshold (on average) are discarded; defaults to True
+        bids_dir: path to BIDS dataset
+        training_outputs_path: path to folder where we stored the weights of the network at the end of training
+        landmarks_physical_space_path: path to file containing the coordinates of the landmark points
+        ground_truth_dir: path to directory containing the ground truth masks and location files
     """
     assert isinstance(unet_patch_side, int), "Patch side must be of type int; got {} instead".format(type(unet_patch_side))
     assert unet_patch_side > 0, "Patch side must be > 0; got {} instead".format(unet_patch_side)
@@ -2186,8 +2026,8 @@ def sanity_check_inputs(unet_patch_side,
     assert 0 < unet_threshold < 1, "UNET threshold must be in the range (0,1)"
     assert isinstance(overlapping, float), "Overlapping must be of type float; got {} instead".format(type(overlapping))
     assert 0 < overlapping < 1, "Overlapping must be in the range (0,1)"
-    assert isinstance(new_spacing, list), "new_spacing must be of type list; got {} instead".format(type(new_spacing))
-    assert all(isinstance(x, float) for x in new_spacing), "All elements inside new_spacing list must be of type float"
+    assert isinstance(new_spacing, tuple), "new_spacing must be of type tuple; got {} instead".format(type(new_spacing))
+    assert all(isinstance(x, float) for x in new_spacing), "All elements inside new_spacing must be of type float"
     assert isinstance(conv_filters, tuple), "conv_filters must be of type tuple; got {} instead".format(type(conv_filters))
     assert all(isinstance(x, int) for x in conv_filters), "All elements inside conv_filters list must be of type int"
     assert isinstance(cv_folds, int), "cv_folds must be of type int; got {} instead".format(type(cv_folds))
