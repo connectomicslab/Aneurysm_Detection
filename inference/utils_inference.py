@@ -552,7 +552,7 @@ def create_second_txt_output_file_with_average_brightness(txt_file_path: str,
                 # append corresponding number of nonzero voxels
                 pred_center_plus_count_nonzero_plus_average_brightness.append(mapping_centers_count_nonzero_voxels[tuple(center_coords)])  # type: list
                 # append corresponding average brightness, rounded to 2 decimal digits and multiplied by 100 to obtain a % probability
-                pred_center_plus_count_nonzero_plus_average_brightness.append(np.round_(mapping_centers_avg_brightness[tuple(center_coords)], decimals=2) * 100)  # type: list
+                pred_center_plus_count_nonzero_plus_average_brightness.append(round_half_up(mapping_centers_avg_brightness[tuple(center_coords)], decimals=2) * 100)  # type: list
                 # write center + count_nonzero_voxels + avg. brightness to disk as a row
                 wr_centers_plus_brightness.writerow(np.asarray(pred_center_plus_count_nonzero_plus_average_brightness, dtype=int))
 
@@ -582,7 +582,7 @@ def save_txt_plus_mapping_centers_nonzero_voxels_plus_avg_brightness(extracted_i
         mapping_centers_avg_brightness: the updated dict
         mapping_centers_count_nonzero_voxels: the updated dict
     """
-    # extract voxel coordinates of the center of the predicted lesion
+    # extract voxel coordinates of the center of the predicted lesion (i.e. of this connected component)
     predicted_center = center_of_mass(extracted_image)  # type: tuple
     # round to closest int
     pred_center_tof_space = [round_half_up(x) for x in predicted_center]  # type: list
@@ -594,7 +594,7 @@ def save_txt_plus_mapping_centers_nonzero_voxels_plus_avg_brightness(extracted_i
     # update mapping; it contains the centers of the predictions as keys and the coordinates of non-zero voxels as values
     mapping_centers_nonzero_coords[tuple(pred_center_tof_space_int)] = np.nonzero(extracted_image)
 
-    # compute average intensity of this predicted aneurysm
+    # compute average intensity of non-zero voxels for this predicted aneurysm (i.e. for this connected component)
     avg_brightness_prob_larg_conn_comp = np.mean(extracted_image[np.nonzero(extracted_image)])
     mapping_centers_avg_brightness[tuple(pred_center_tof_space_int)] = avg_brightness_prob_larg_conn_comp
 
@@ -604,14 +604,14 @@ def save_txt_plus_mapping_centers_nonzero_voxels_plus_avg_brightness(extracted_i
     return mapping_centers_nonzero_coords, mapping_centers_avg_brightness, mapping_centers_count_nonzero_voxels
 
 
-def create_txt_output_file_and_remove_dark_fp(output_volume_path: str,
+def create_txt_output_file_and_remove_dark_fp(probabilistic_output_volume_path: str,
                                               txt_file_path: str,
                                               original_bfc_bet_tof: np.ndarray,
                                               remove_dark_fp: bool,
                                               dark_fp_threshold: float) -> Tuple[np.ndarray, dict, dict, str, dict]:
     """This function creates the output txt file used for the detection task and returns the binarized segmentation output volume
     Args:
-        output_volume_path: path to output segmentation volume
+        probabilistic_output_volume_path: path to probabilistic output segmentation volume in original space (i.e. resampled back to original tof space)
         txt_file_path: path of detection output file
         original_bfc_bet_tof: original bias-field-corrected volume after brain extraction before resampling
         remove_dark_fp: if set to True, candidate aneurysms that are not brighter than a certain threshold (on average) are discarded
@@ -623,7 +623,7 @@ def create_txt_output_file_and_remove_dark_fp(output_volume_path: str,
         second_txt_path: path to second txt output file that contains the centers of the predictions and the corresponding average brightness
         mapping_centers_count_nonzero_voxels: it contains the centers of the predictions as keys and the count of nonzero voxels per conn. comp. as value
     """
-    probabilistic_out_segm_map_obj = nib.load(output_volume_path)  # type: nib.Nifti1Image # load output segmentation with nibabel
+    probabilistic_out_segm_map_obj = nib.load(probabilistic_output_volume_path)  # type: nib.Nifti1Image # load output segmentation with nibabel
     probabilistic_out_segm_map = np.asanyarray(probabilistic_out_segm_map_obj.dataobj)  # type: np.ndarray # extract numpy array
 
     # assign 1 to voxels that are non-zero
@@ -800,7 +800,7 @@ def save_output_mask_and_output_location(segm_map_resampled: np.ndarray,
     original_spacing = orig_bfc_angio_sitk.GetSpacing()  # type: tuple
     # extract size of original (i.e. non-resampled) angio volume
     original_size = list(orig_bfc_angio_sitk.GetSize())
-    # create output file for registration
+    # create output file for resampling
     out_path = os.path.join(tmp_path, "result_mask_original_space.nii.gz")
     # resample output volume to original spacing
     _, segm_map_nib_obj, segm_map = resample_volume_inverse(os.path.join(output_folder_path_, out_filename),
@@ -823,7 +823,7 @@ def save_output_mask_and_output_location(segm_map_resampled: np.ndarray,
     # make sure mask is binary
     assert is_binary(segm_map_binary), "WATCH OUT: mask is not binary in original space"
 
-    # save binary output mask, OVERWRITING previous probabilistic one
+    # save binary output mask in original (i.e. non-resampled) space, OVERWRITING previous probabilistic one which was in resampled space
     save_volume_mask_to_disk(segm_map_binary, output_folder_path_, segm_map_nib_obj.affine, out_filename, output_dtype="int32")
 
     # also remove dark FP from segmentation map (before we had only removed them from result.txt)
