@@ -32,7 +32,9 @@ __email__ = "tommydino@hotmail.it"
 __status__ = "Prototype"
 
 
-def save_pickle_list_to_disk(list_to_save: list, out_dir: str, out_filename: str) -> None:
+def save_pickle_list_to_disk(list_to_save: list,
+                             out_dir: str,
+                             out_filename: str) -> None:
     """This function saves a list to disk
     Args:
         list_to_save (list): list that we want to save
@@ -97,7 +99,8 @@ def define_output_folders(training_outputs_folder: str,
     return model_path_, plots_path_, tensorboard_cbk_path_, test_subs_path_
 
 
-def create_tf_dataset_from_patches_and_masks(all_angio_patches_list, all_angio_masks_list):
+def create_tf_dataset_from_patches_and_masks(all_angio_patches_list,
+                                             all_angio_masks_list):
     """This function creates a tf.data.Dataset from two lists: the one containing the patches and the one containing the corresponding masks
     Args:
         all_angio_patches_list (list): it contains all the patches
@@ -122,7 +125,8 @@ def create_tf_dataset_from_patches_and_masks(all_angio_patches_list, all_angio_m
     return dataset_, patch_side_, buffer_size_
 
 
-def create_dataset_positives_one_sub(subdir: str, file: str):
+def create_dataset_positives_one_sub(subdir: str,
+                                     file: str):
     """This function creates a positive patch and the corresponding mask
     Args:
         subdir (str): folder where positive patch is stored
@@ -149,7 +153,9 @@ def create_dataset_positives_one_sub(subdir: str, file: str):
     return out_array
 
 
-def create_dataset_positives_parallel(pos_patches_path: str, subs_to_use: list, n_parallel_jobs: int):
+def create_dataset_positives_parallel(pos_patches_path: str,
+                                      subs_to_use: list,
+                                      n_parallel_jobs: int):
     """This function creates the dataset of all positive patches (and corresponding masks) in parallel
     Args:
         pos_patches_path (str): path to folder containing positive patches
@@ -196,7 +202,8 @@ def create_dataset_positives_parallel(pos_patches_path: str, subs_to_use: list, 
     return dataset, patch_side, buffer_size
 
 
-def create_dataset_negatives_one_sub(subdir, file):
+def create_dataset_negatives_one_sub(subdir,
+                                     file):
     """This function creates a negative patch and the corresponding empty mask
     Args:
         subdir (str): folder where negative patch is stored
@@ -217,7 +224,9 @@ def create_dataset_negatives_one_sub(subdir, file):
     return out_array
 
 
-def create_dataset_negatives_parallel(neg_patches_path, subs_to_use, n_parallel_jobs):
+def create_dataset_negatives_parallel(neg_patches_path,
+                                      subs_to_use,
+                                      n_parallel_jobs):
     """This function creates the dataset of all negative patches (and corresponding empty masks) in parallel
     Args:
         neg_patches_path (str): path to folder containing negative patches
@@ -270,7 +279,7 @@ def create_batched_augmented_tf_dataset(pos_patches_path: str,
                                         neg_patches_path: str,
                                         batch_size: int,
                                         n_parallel_jobs: int,
-                                        augment=False):
+                                        augment: bool = False):
     """This function creates a tf.data.Dataset from the folders containing the negative and positive patches.
     Args:
         pos_patches_path (str): path to folder where positive patches are stored
@@ -311,8 +320,6 @@ def check_mask_is_binary_and_non_empty(mask):
     """This function ensures that the input mask is binary and non-empty
     Args:
         mask (tf.Tensor): mask volume to check
-    Returns:
-        None
     Raises:
         ValueError: if mask is either not binary or empty
     """
@@ -320,7 +327,8 @@ def check_mask_is_binary_and_non_empty(mask):
         raise ValueError("Mask is either not binary or empty")
 
 
-def augment_dataset(tf_dataset, out_dataset):
+def augment_dataset(tf_dataset,
+                    out_dataset):
     """This function performs the data augmentation of the positive patches (i.e. those that contain an aneurysm)
     Args:
         tf_dataset (tf.data.Dataset): input dataset to augment
@@ -397,7 +405,8 @@ def augment_dataset(tf_dataset, out_dataset):
     return out_dataset, tot_numb_samples_orig_plus_augmented
 
 
-def create_standardized_batched_dataset_and_prefetch(ds, batch_size_):
+def create_standardized_batched_dataset_and_prefetch(ds,
+                                                     batch_size_):
     """This function takes as input a tf.data.Dataset, standardize all samples and returns the batched version of it.
     Args:
         ds (tf.data.Dataset): dataset that we want to split
@@ -422,14 +431,16 @@ def create_standardized_batched_dataset_and_prefetch(ds, batch_size_):
     return batched_train_dataset_
 
 
-def dice_coeff(y_true, y_pred, smooth=1.):
+def dice_coeff(y_true: tf.Tensor,
+               y_pred: tf.Tensor,
+               smooth: float = 1.) -> float:
     """This function computes the soft dice coefficient between the predicted mask and the ground truth mask
     Args:
-        y_true (tf.Tensor): ground truth mask
-        y_pred (tf.Tensor): predicted mask
-        smooth (float): value added for numerical stability (avoid division by 0)
+        y_true: ground truth mask
+        y_pred: predicted mask
+        smooth: value added for numerical stability (avoid division by 0)
     Returns:
-        dice_coefficient (tf.Tensor): dice coefficient
+        dice_coefficient: dice coefficient
     """
     # flatten vectors and cast to float32
     y_true_f = tf.cast(tf.reshape(y_true, [-1]), tf.float32)
@@ -443,13 +454,14 @@ def dice_coeff(y_true, y_pred, smooth=1.):
     return dice_coefficient
 
 
-def dice_loss(y_true, y_pred):
+def dice_loss(y_true: tf.Tensor,
+              y_pred: tf.Tensor) -> float:
     """This function computes the dice loss as 1-dsc_coeff
     Args:
-        y_true (tf.Tensor): ground truth mask
-        y_pred (tf.Tensor): predicted mask
+        y_true: ground truth mask
+        y_pred: predicted mask
     Returns:
-        dsc_loss (tf.Tensor): dice loss
+        dsc_loss: dice loss
     """
     dsc_loss = 1 - dice_coeff(y_true, y_pred)
 
@@ -534,7 +546,9 @@ def create_compiled_unet(inputs_: tf.keras.Input,
     return model
 
 
-def save_ext_train_curves(train_loss, train_dice, image_path_):
+def save_ext_train_curves(train_loss,
+                          train_dice,
+                          image_path_):
     """ This function takes as input train_dice, train_loss, and plots them into a unique figure which is saved in the specified path
     Args:
         train_loss (list): training loss
@@ -565,7 +579,8 @@ def save_ext_train_curves(train_loss, train_dice, image_path_):
     fig.savefig(image_path_)  # save the full figure
 
 
-def save_train_bce_curves(train_bce, image_path_):
+def save_train_bce_curves(train_bce,
+                          image_path_):
     """This function plots train binary cross entropy during learning
     Args:
         train_bce (list): train binary cross entropy
@@ -581,7 +596,11 @@ def save_train_bce_curves(train_bce, image_path_):
     fig2.savefig(image_path_)  # save the full figure
 
 
-def save_ext_train_val_curves(train_loss, train_dice, val_loss_, val_dice_, image_path_):
+def save_ext_train_val_curves(train_loss,
+                              train_dice,
+                              val_loss_,
+                              val_dice_,
+                              image_path_):
     """ This function takes as input train_dice, val_dice, train_loss, val_loss and plots them into a unique figure which is saved in the specified path
     Args:
         train_loss (list): training loss
@@ -616,7 +635,9 @@ def save_ext_train_val_curves(train_loss, train_dice, val_loss_, val_dice_, imag
     fig.savefig(image_path_)  # save the full figure
 
 
-def save_train_val_bce_curves(train_bce, val_bce, image_path_):
+def save_train_val_bce_curves(train_bce,
+                              val_bce,
+                              image_path_):
     """This function plots train and validation binary cross entropy during learning
     Args:
         train_bce (list): train binary cross entropy
