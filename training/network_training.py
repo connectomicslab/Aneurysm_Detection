@@ -479,15 +479,18 @@ def bce_dice_loss(loss_lambda):
     return loss
 
 
-def create_compiled_unet(inputs_, learning_rate, lambda_loss, conv_filters):
+def create_compiled_unet(inputs_: tf.keras.Input,
+                         learning_rate: float,
+                         lambda_loss: float,
+                         conv_filters: tuple) -> tf.keras.Model:
     """This function creates a 3D U-Net starting from an input with modifiable dimensions and it returns the compiled model
     Args:
-        inputs_ (tf.keras.Input): input to the model; used to set the input dimensions
-        learning_rate (float): learning rate of the model
-        lambda_loss (float): value that weights the two terms of the hybrid loss
-        conv_filters (tuple): it contains the number of filters to use in the convolution layers
+        inputs_: input to the model; used to set the input dimensions
+        learning_rate: learning rate of the model
+        lambda_loss: value that weights the two terms of the hybrid loss
+        conv_filters: it contains the number of filters to use in the convolution layers
     Returns:
-        model (tf.keras.Model): the compiled U-Net
+        model: the compiled U-Net
     """
     # DOWNWARD PATH (encoder)
     conv1 = tf.keras.layers.Conv3D(conv_filters[0], 3, activation='relu', padding='same', data_format="channels_last")(inputs_)
@@ -631,40 +634,38 @@ def save_train_val_bce_curves(train_bce, val_bce, image_path_):
     fig2.savefig(image_path_)  # save the full figure
 
 
-def patch_wise_training(data_path,
-                        train_subs,
-                        test_subs,
-                        lambda_loss,
-                        epochs,
-                        batch_size,
-                        lr,
-                        conv_filters,
-                        cv_fold,
-                        date,
-                        percentage_validation_subs,
-                        n_parallel_jobs,
-                        training_outputs_folder,
-                        path_previous_weights_for_pretraining,
-                        use_validation_data):
+def patch_wise_training(data_path: str,
+                        train_subs: list,
+                        test_subs: list,
+                        lambda_loss: float,
+                        epochs: int,
+                        batch_size: int,
+                        lr: float,
+                        conv_filters: tuple,
+                        cv_fold: int,
+                        date: str,
+                        percentage_validation_subs: float,
+                        n_parallel_jobs: int,
+                        training_outputs_folder: str,
+                        path_previous_weights_for_pretraining: str,
+                        use_validation_data: bool) -> None:
     """This function performs the patch-wise training
     Args:
-        data_path (str): path to dataset of patches
-        train_subs (list): containing the training sub_ses
-        test_subs (list): containing the test sub_ses
-        lambda_loss (float): value that weights the two terms of the hybrid loss
-        epochs (int): number of training epochs
-        batch_size (int): size of each batch
-        lr (float): learning rate
-        conv_filters (list): it contains the number of filters to use in the convolution layers
-        cv_fold (int): cross validation fold
-        date (str): today's date
-        percentage_validation_subs (float): percentage of subjects to keep for validation
-        n_parallel_jobs (int): number of jobs to run in parallel
-        training_outputs_folder (str): path to output folder
-        path_previous_weights_for_pretraining (str): path where previous weights are stored (used for pretraining)
-        use_validation_data (bool): if True, validation data is created to monitor the training curves
-    Returns:
-        None
+        data_path: path to dataset of patches
+        train_subs: containing the training sub_ses
+        test_subs: containing the test sub_ses
+        lambda_loss: value that weights the two terms of the hybrid loss
+        epochs: number of training epochs
+        batch_size: size of each batch
+        lr: learning rate
+        conv_filters: it contains the number of filters to use in the convolution layers
+        cv_fold: cross validation fold
+        date: today's date
+        percentage_validation_subs: percentage of subjects to keep for validation
+        n_parallel_jobs: number of jobs to run in parallel
+        training_outputs_folder: path to output folder
+        path_previous_weights_for_pretraining: path where previous weights are stored (used for pretraining)
+        use_validation_data: if True, validation data is created to monitor the training curves
     Raises:
         AssertionError: if the path to the positive patches folder does not exist
         AssertionError: if the path to the positive masks folder does not exist
@@ -791,38 +792,36 @@ def patch_wise_training(data_path,
     print_running_time(start_global, end_global, "Running")
 
 
-def cross_validation(data_path,
-                     lambda_loss,
-                     epochs,
-                     batch_size,
-                     lr,
-                     conv_filters,
-                     percentage_validation_subs,
-                     n_parallel_jobs,
-                     date,
-                     training_outputs_folder,
-                     fold_to_do,
-                     use_validation_data,
-                     path_previous_weights_for_pretraining,
-                     train_test_split_to_replicate):
+def cross_validation(data_path: str,
+                     lambda_loss: float,
+                     epochs: int,
+                     batch_size: int,
+                     lr: float,
+                     conv_filters: tuple,
+                     percentage_validation_subs: float,
+                     n_parallel_jobs: int,
+                     date: str,
+                     training_outputs_folder: str,
+                     fold_to_do: int,
+                     use_validation_data: bool,
+                     path_previous_weights_for_pretraining: str,
+                     train_test_split_to_replicate: str) -> None:
     """This function splits the data in train and test, ensuring that multiple sessions of the same subject are either all in train or all in test
     Args:
-        data_path (str): path to dataset of patches
-        lambda_loss (float): value that weights the two terms of the hybrid loss
-        epochs (int): number of training epochs
-        batch_size (int): batch size
-        lr (float): learning rate
-        conv_filters (list): it contains the number of filters to use in the convolution layers
-        percentage_validation_subs (float): percentage of subjects to keep for validation
-        date (str): today's date
-        training_outputs_folder (str): path to output folder
-        n_parallel_jobs (int): number of jobs to run in parallel
-        fold_to_do (int): training fold that will be done
-        use_validation_data (bool): if True, validation data is created to monitor the training curves
-        path_previous_weights_for_pretraining (str): path where previous weights are stored (used for pretraining); if empty, no pretraining is done
-        train_test_split_to_replicate (str): path to directory containing the test subjects of each CV split
-    Returns:
-        None
+        data_path: path to dataset of patches
+        lambda_loss: value that weights the two terms of the hybrid loss
+        epochs: number of training epochs
+        batch_size: batch size
+        lr: learning rate
+        conv_filters: it contains the number of filters to use in the convolution layers
+        percentage_validation_subs: percentage of subjects to keep for validation
+        date: today's date
+        training_outputs_folder: path to output folder
+        n_parallel_jobs: number of jobs to run in parallel
+        fold_to_do: training fold that will be done
+        use_validation_data: if True, validation data is created to monitor the training curves
+        path_previous_weights_for_pretraining: path where previous weights are stored (used for pretraining); if empty, no pretraining is done
+        train_test_split_to_replicate: path to directory containing the test subjects of each CV split
     """
     assert fold_to_do in range(1, 6), "Fold can only be 1, 2, 3, 4, 5; found {} instead".format(fold_to_do)
     print("\nTensorflow version used: {}".format(tf.version.VERSION))  # print tensorflow version
@@ -859,7 +858,7 @@ def main():
     lambda_loss = config_dict['lambda_loss']  # type: float # value that weights the two terms of the hybrid loss
     batch_size = config_dict['batch_size']  # type: int
     lr = config_dict['lr']  # type: float # learning rate
-    conv_filters = config_dict['conv_filters']  # type: list # number of filters in the convolutional layers
+    conv_filters = tuple(config_dict['conv_filters'])  # type: tuple # number of filters in the convolutional layers
     fold_to_do = config_dict['fold_to_do']  # type: int # the five folds are 1, 2, 3, 4, 5
     use_validation_data = str2bool(config_dict['use_validation_data'])  # type: bool # whether to use validation data or not
     percentage_validation_subs = config_dict['percentage_validation_subs']   # type: float # percentage of samples to use for validation
