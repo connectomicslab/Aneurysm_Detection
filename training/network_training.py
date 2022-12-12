@@ -655,9 +655,55 @@ def save_train_val_bce_curves(train_bce,
     fig2.savefig(image_path_)  # save the full figure
 
 
+def extract_unique_elements(lst: list,
+                            ordered: bool = True) -> list:
+    """This function extracts the unique elements of the input list (i.e. it removes duplicates)
+    and returns them as an output list; if ordered=True (as by default), the returned list is ordered.
+    Args:
+        lst: input list from which we want to extract the unique elements
+        ordered: whether the output list of unique values is sorted or not; True by default
+    Returns:
+        out_list: list containing unique values
+    """
+    out_list = list(set(lst))  # type: list
+
+    if ordered:  # if we want to sort the list of unique values
+        out_list.sort()  # type: list
+
+    return out_list
+
+
+def divide_sub_ses_into_train_and_val(percentage_validation_subs: float,
+                                      all_sub_ses: list) -> Tuple[list, list]:
+    """This function performs the train-validation split of the sub_ses but on a subject-wise level, cause some subs have multiple sessions and we want to avoid that
+    one session goes to training and another session of the same subject goes to validation
+    Args:
+        percentage_validation_subs: percentage of sub_ses that will be used for validation
+        all_sub_ses: list of all sub_ses
+    """
+    assert 0 < percentage_validation_subs <= 0.3, f"The percentage of validation subjects should be in the range (0., 0.3); found {percentage_validation_subs} instead"
+    all_subs = [re.findall(r"sub-\d+", element)[0] for element in all_sub_ses]  # extract only subs
+    all_subs_unique = extract_unique_elements(all_subs)  # extract unique elements (i.e. remove duplicates)
+    nb_val_subs = int(round_half_up(percentage_validation_subs * len(all_subs_unique)))  # keep XX% of the subs for validation
+
+    # extract validation and train subjects
+    val_subs = random.sample(all_subs_unique, nb_val_subs)
+    train_subs = [sub for sub in all_subs_unique if sub not in val_subs]
+
+    # extract corresponding validation sub_ses
+    idxs_val_subs = [idx for idx, value in enumerate(all_subs) if value in val_subs]
+    val_sub_ses = [all_sub_ses[idx] for idx in idxs_val_subs]
+
+    # extract corresponding training sub_ses
+    idxs_train_subs = [idx for idx, value in enumerate(all_subs) if value in train_subs]
+    train_sub_ses = [all_sub_ses[idx] for idx in idxs_train_subs]  # remove validation sub_ses from train_subs
+
+    return train_sub_ses, val_sub_ses
+
+
 def patch_wise_training(data_path: str,
-                        train_subs: list,
-                        test_subs: list,
+                        all_sub_ses: list,
+                        test_sub_ses: list,
                         lambda_loss: float,
                         epochs: int,
                         batch_size: int,
@@ -673,8 +719,8 @@ def patch_wise_training(data_path: str,
     """This function performs the patch-wise training
     Args:
         data_path: path to dataset of patches
-        train_subs: containing the training sub_ses
-        test_subs: containing the test sub_ses
+        all_sub_ses: containing the training sub_ses
+        test_sub_ses: containing the test sub_ses
         lambda_loss: value that weights the two terms of the hybrid loss
         epochs: number of training epochs
         batch_size: size of each batch
@@ -708,23 +754,30 @@ def patch_wise_training(data_path: str,
     model_path, plots_path, tensorboard_path, test_subs_path = define_output_folders(training_outputs_folder, parent_dir, cv_fold)
 
     # save sub_ses of test subjects as a list
-    save_pickle_list_to_disk(test_subs, test_subs_path, "test_sub_ses.pkl")
+    save_pickle_list_to_disk(test_sub_ses, test_subs_path, "test_sub_ses.pkl")
 
     # if we want a validation set to monitor training curves/metrics
     if use_validation_data:
         # ------------------------------ divide subjects into train and validation ---------------------------------
-        assert 0 < percentage_validation_subs <= 0.3, "The percentage of validation subjects should be in the range (0., 0.3); found {} instead".format(percentage_validation_subs)
-        nb_val_subs = int(round_half_up(percentage_validation_subs * len(train_subs)))  # keep XX% of the sub_ses for validation
-        val_subs = random.sample(train_subs, nb_val_subs)
-        train_subs = [sub_ses for sub_ses in train_subs if sub_ses not in val_subs]  # remove validation sub_ses from train_subs
+        train_sub_ses, val_sub_ses = divide_sub_ses_into_train_and_val(percentage_validation_subs,
+                                                                       all_sub_ses)
 
         # ------------------------------- create TRAINING dataset --------------------------------------
         print("\nCreating training tf.dataset...")
-        batched_train_dataset, train_patch_side = create_batched_augmented_tf_dataset(pos_patches_path, train_subs, neg_patches_path, batch_size, n_parallel_jobs, augment=True)
+        batched_train_dataset, train_patch_side = create_batched_augmented_tf_dataset(pos_patches_path,
+                                                                                      train_sub_ses,
+                                                                                      neg_patches_path,
+                                                                                      batch_size,
+                                                                                      n_parallel_jobs,
+                                                                                      augment=True)
 
         # ------------------------------- create VALIDATION dataset -------------------------------------
         print("\nCreating validation tf.dataset...")
-        batched_validation_dataset, val_patch_side = create_batched_augmented_tf_dataset(pos_patches_path, val_subs, neg_patches_path, batch_size, n_parallel_jobs)
+        batched_validation_dataset, val_patch_side = create_batched_augmented_tf_dataset(pos_patches_path,
+                                                                                         val_sub_ses,
+                                                                                         neg_patches_path,
+                                                                                         batch_size,
+                                                                                         n_parallel_jobs)
 
         assert train_patch_side == val_patch_side, "Train and validation patch side must be equal; train: {}, val: {}".format(train_patch_side, val_patch_side)
 
@@ -732,7 +785,12 @@ def patch_wise_training(data_path: str,
     else:
         # ------------------------------- create TRAINING dataset --------------------------------------
         print("\nCreating training tf.dataset...")
-        batched_train_dataset, train_patch_side = create_batched_augmented_tf_dataset(pos_patches_path, train_subs, neg_patches_path, batch_size, n_parallel_jobs, augment=True)
+        batched_train_dataset, train_patch_side = create_batched_augmented_tf_dataset(pos_patches_path,
+                                                                                      all_sub_ses,
+                                                                                      neg_patches_path,
+                                                                                      batch_size,
+                                                                                      n_parallel_jobs,
+                                                                                      augment=True)
 
     # ------------------------------- print "data loading" time -------------------------------------
     end_data_loading = time.time()  # stop timer
