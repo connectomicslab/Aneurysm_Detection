@@ -1359,6 +1359,7 @@ def convert_mni_to_angio(df_landmarks: pd.DataFrame,
             wr = csv.writer(myfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
             wr.writerow(['x', 'y', 'z', 't'])
             wr.writerow(landmark_point_physical_space_mni)
+
         # --------------------------------------------------------------- MNI_2_struct ------------------------------------------------------------
         # load landmark point as dataframe
         mni_df = pd.read_csv(csv_path)
