@@ -81,7 +81,7 @@ def extract_registration_quality_metrics(bids_ds_path: str,
         if "sub" in sub and os.path.isdir(os.path.join(reg_metrics_dir, sub)):
             for ses in os.listdir(os.path.join(reg_metrics_dir, sub)):
                 if "ses" in ses and os.path.isdir(os.path.join(reg_metrics_dir, sub, ses)):
-                    sub_ses = "{}_{}".format(sub, ses)
+                    sub_ses = f"{sub}_{ses}"
                     if sub_ses not in sub_ses_test:  # only use training ones otherwise we might introduce a bias towards the registration quality metrics of the test set
                         for files in os.listdir(os.path.join(reg_metrics_dir, sub, ses)):
                             if "mni2struct" in files:
@@ -99,13 +99,15 @@ def extract_registration_quality_metrics(bids_ds_path: str,
     return p3_neigh_corr_struct_2_tof, p97_mut_inf_struct_2_tof
 
 
-def extract_reg_quality_metrics_one_sub(input_path: str) -> Tuple[float, float]:
+def extract_reg_quality_metrics_one_sub(input_path: str) -> Tuple[float, float, float, float]:
     """This function extracts and returns the struct_2_tof registration quality metrics for one subject.
     Args:
         input_path: path to folder where the registration quality metrics are stored for this subject
     Returns:
         struct_2_tof_nc: neighborhood correlation metric for the struct_2_tof registration of this subject
         struct_2_tof_mi: mattes mutual information metric for the struct_2_tof registration of this subject
+        mni_2_struct_nc: neighborhood correlation metric for the mni_2_struct registration of this subject
+        mni_2_struct_2_mi: mattes mutual information metric for the mni_2_struct registration of this subject
     """
     for files in os.listdir(input_path):
         if "struct2tof" in files:
@@ -113,17 +115,19 @@ def extract_reg_quality_metrics_one_sub(input_path: str) -> Tuple[float, float]:
             struct_2_tof_nc = struct_2_tof_quality_metrics.iloc[0]['neigh_corr']
             struct_2_tof_mi = struct_2_tof_quality_metrics.iloc[0]['mut_inf']
         elif "mni2struct" in files:
-            pass
+            mni_2_struct_quality_metrics = pd.read_csv(os.path.join(input_path, files))
+            mni_2_struct_nc = mni_2_struct_quality_metrics.iloc[0]['neigh_corr']
+            mni_2_struct_2_mi = mni_2_struct_quality_metrics.iloc[0]['mut_inf']
         else:
             raise ValueError("Unknown values found")
 
-    return struct_2_tof_nc, struct_2_tof_mi
+    return struct_2_tof_nc, struct_2_tof_mi, mni_2_struct_nc, mni_2_struct_2_mi
 
 
-def retrieve_registration_params(registration_dir_: str) -> Tuple[str, str, str, str]:
+def retrieve_registration_params(registration_dir: str) -> Tuple[str, str, str, str]:
     """This function retrieves the registration parameters for each subject
     Args:
-        registration_dir_: path to folder containing the registration parameters of each subject
+        registration_dir: path to folder containing the registration parameters of each subject
     Returns:
         mni_2_T1_mat_path_: path to .mat file corresponding to the MNI --> struct registration
         struct_2_tof_mat_path_: path to .mat file corresponding to the struct --> TOF registration
@@ -133,38 +137,38 @@ def retrieve_registration_params(registration_dir_: str) -> Tuple[str, str, str,
         AssertionError: if input path does not exist
         AssertionError: if more (or less) than 4 registration paths are retrieved
     """
-    assert os.path.exists(registration_dir_), "Path {} does not exist".format(registration_dir_)
+    assert os.path.exists(registration_dir), f"Path {registration_dir} does not exist"
     extension_mat = '.mat'  # type: str # set file extension to be matched
     extension_gz = '.gz'  # type: str # set file extension to be matched
     cnt = 0  # type: int # counter variable that we use to ensure that exactly 4 registration parameters were retrieved
 
-    for files_ in os.listdir(registration_dir_):
+    for files_ in os.listdir(registration_dir):
         ext_ = os.path.splitext(files_)[-1].lower()  # get the file extension
-        if "ADAM" in registration_dir_:
+        if "ADAM" in registration_dir:
             if ext_ in extension_mat and "MNI_2_struct" in files_:  # if the extensions matches and a specific substring is in the file path
-                mni_2_t1_mat_path_ = os.path.join(registration_dir_, files_)  # type: str
+                mni_2_t1_mat_path_ = os.path.join(registration_dir, files_)  # type: str
                 cnt += 1  # increment counter
             elif ext_ in extension_mat and "struct_2_TOF" in files_:  # if the extensions matches and a specific substring is in the file path
-                struct_2_tof_mat_path_ = os.path.join(registration_dir_, files_)  # type: str
+                struct_2_tof_mat_path_ = os.path.join(registration_dir, files_)  # type: str
                 cnt += 1  # increment counter
             elif ext_ in extension_gz and "MNI_2_struct_1Warp" in files_:  # if the extensions matches and a specific substring is in the file path
-                mni_2_t1_warp_path_ = os.path.join(registration_dir_, files_)  # type: str
+                mni_2_t1_warp_path_ = os.path.join(registration_dir, files_)  # type: str
                 cnt += 1  # increment counter
             elif ext_ in extension_gz and "MNI_2_struct_1InverseWarp" in files_:  # if the extensions matches and a specific substring is in the file path
-                mni_2_t1_inverse_warp_path_ = os.path.join(registration_dir_, files_)  # type: str
+                mni_2_t1_inverse_warp_path_ = os.path.join(registration_dir, files_)  # type: str
                 cnt += 1  # increment counter
         else:
             if ext_ in extension_mat and "MNI_2_T1" in files_:  # if the extensions matches and a specific substring is in the file path
-                mni_2_t1_mat_path_ = os.path.join(registration_dir_, files_)  # type: str
+                mni_2_t1_mat_path_ = os.path.join(registration_dir, files_)  # type: str
                 cnt += 1  # increment counter
             elif ext_ in extension_mat and "T1_2_TOF" in files_:  # if the extensions matches and a specific substring is in the file path
-                struct_2_tof_mat_path_ = os.path.join(registration_dir_, files_)  # type: str
+                struct_2_tof_mat_path_ = os.path.join(registration_dir, files_)  # type: str
                 cnt += 1  # increment counter
             elif ext_ in extension_gz and "MNI_2_T1_1Warp" in files_:  # if the extensions matches and a specific substring is in the file path
-                mni_2_t1_warp_path_ = os.path.join(registration_dir_, files_)  # type: str
+                mni_2_t1_warp_path_ = os.path.join(registration_dir, files_)  # type: str
                 cnt += 1  # increment counter
             elif ext_ in extension_gz and "MNI_2_T1_1InverseWarp" in files_:  # if the extensions matches and a specific substring is in the file path
-                mni_2_t1_inverse_warp_path_ = os.path.join(registration_dir_, files_)  # type: str
+                mni_2_t1_inverse_warp_path_ = os.path.join(registration_dir, files_)  # type: str
                 cnt += 1  # increment counter
 
     assert cnt == 4, "Exactly 4 registration parameters must be retrieved"
@@ -173,17 +177,17 @@ def retrieve_registration_params(registration_dir_: str) -> Tuple[str, str, str,
 
 
 def load_nifti_and_resample(volume_path: str,
-                            tmp_folder_: str,
+                            tmp_folder: str,
                             out_name: str,
-                            new_spacing_: tuple,
+                            new_spacing: tuple,
                             binary_mask: bool = False) -> Tuple[sitk.Image, nib.Nifti1Image, np.ndarray, np.ndarray]:
     """This function loads a nifti volume, resamples it to a specified voxel spacing, and returns both
     the resampled nifti object and the resampled volume as numpy array, together with the affine matrix
     Args:
         volume_path: path to nifti volume
-        tmp_folder_: path to folder where we temporarily save the resampled volume
+        tmp_folder: path to folder where we temporarily save the resampled volume
         out_name: name of resampled volume temporarily saved to disk
-        new_spacing_: desired voxel spacing for output volume
+        new_spacing: desired voxel spacing for output volume
         binary_mask: defaults to False. If set to True, it means that the volume is a binary mask
     Returns:
         resampled_volume_obj_sitk: sitk object of resampled output volume
@@ -191,13 +195,13 @@ def load_nifti_and_resample(volume_path: str,
         resampled_volume: numpy resampled output volume
         aff_matrix: affine matrix associated with resampled output volume
     """
-    create_dir_if_not_exist(tmp_folder_)  # if directory does not exist, create it
+    create_dir_if_not_exist(tmp_folder)  # if directory does not exist, create it
 
-    out_path = os.path.join(tmp_folder_, out_name)
+    out_path = os.path.join(tmp_folder, out_name)
     if binary_mask:  # if the volume is a mask, use near.neighbor interpolator in order not to create new connected components
-        resampled_volume_obj_sitk, resampled_volume_obj_nib, resampled_volume = resample_volume(volume_path, new_spacing_, out_path, interpolator=sitk.sitkNearestNeighbor)
+        resampled_volume_obj_sitk, resampled_volume_obj_nib, resampled_volume = resample_volume(volume_path, new_spacing, out_path, interpolator=sitk.sitkNearestNeighbor)
     else:  # instead, if it's a normal nifti volume, use linear interpolator
-        resampled_volume_obj_sitk, resampled_volume_obj_nib, resampled_volume = resample_volume(volume_path, new_spacing_, out_path, interpolator=sitk.sitkLinear)
+        resampled_volume_obj_sitk, resampled_volume_obj_nib, resampled_volume = resample_volume(volume_path, new_spacing, out_path, interpolator=sitk.sitkLinear)
     assert len(resampled_volume.shape) == 3, "Nifti volume is not 3D"
     aff_matrix = resampled_volume_obj_nib.affine  # extract and save affine matrix
 
@@ -297,7 +301,7 @@ def distance_is_plausible(patch_center_coordinates_physical_space: list,
         True: if distances are within plausible ranges for aneurysms (ranges were computed empirically)
         False: if distances are not within plausible ranges for aneurysms (ranges were computed empirically)
         """
-    assert len(distances_thresholds) == 2, "Tuple must have len==2; instead, len=={}".format(len(distances_thresholds))
+    assert len(distances_thresholds) == 2, f"Tuple must have len==2; instead, len=={len(distances_thresholds)}"
 
     distances = []
     for _, coords in df_landmarks_tof_space.iterrows():
@@ -312,7 +316,7 @@ def distance_is_plausible(patch_center_coordinates_physical_space: list,
     return True if (min_dist < distances_thresholds[0] and mean_dist < distances_thresholds[1]) else False
 
 
-def extracting_conditions_are_met(angio_patch_after_bet_scale_1_: np.ndarray,
+def extracting_conditions_are_met(angio_patch_after_bet: np.ndarray,
                                   vessel_mni_patch_: np.ndarray,
                                   vessel_mni_volume_: np.ndarray,
                                   nii_volume_: np.ndarray,
@@ -331,7 +335,7 @@ def extracting_conditions_are_met(angio_patch_after_bet_scale_1_: np.ndarray,
         5) the neigh_corr quality metric of this subject must be above the 10th percentile of the distribution of all neigh_corr in the dataset. If it's not, there was probably a registration mistake
         6) the mutual_inf quality metric of this subject must be below the 90th percentile of the distribution of all mutual_inf in the dataset. If it's not, there was probably a registration mistake
     Args:
-        angio_patch_after_bet_scale_1_: small-scale angio patch
+        angio_patch_after_bet: brain extracted angio patch
         vessel_mni_patch_: corresponding vessel mni patch of same dims of angio patch
         vessel_mni_volume_: vessel mni volume of this subject resampled to uniform voxel space
         nii_volume_: BET angio volume (i.e. after brain extraction) resampled to uniform voxel space
@@ -350,14 +354,14 @@ def extracting_conditions_are_met(angio_patch_after_bet_scale_1_: np.ndarray,
     if anatomically_informed:  # if we want to make an anatomically-informed sliding window (i.e. we check the extracting conditions)
         # if the registration is accurate enough (i.e. the registration metrics for this subject are not outliers wrt the entire distribution)
         if registration_accurate_enough:
-            # if the small-scale angio patch is not empty and the vesselMNI patch is a cube
-            if np.count_nonzero(angio_patch_after_bet_scale_1_) != 0 and vessel_mni_patch_.shape == (patch_side_scale_1, patch_side_scale_1, patch_side_scale_1):
+            # if the angio patch is not empty and the vesselMNI patch is a cube
+            if np.count_nonzero(angio_patch_after_bet) != 0 and vessel_mni_patch_.shape == (patch_side_scale_1, patch_side_scale_1, patch_side_scale_1):
                 # to avoid division by 0, first check that denominator is != 0 and there are no NaNs
-                if np.max(vessel_mni_patch_) != 0 and not math.isnan(np.mean(vessel_mni_patch_)) and not math.isnan(np.mean(angio_patch_after_bet_scale_1_)):
+                if np.max(vessel_mni_patch_) != 0 and not math.isnan(np.mean(vessel_mni_patch_)) and not math.isnan(np.mean(angio_patch_after_bet)):
                     ratio_local_vessel_mni = np.mean(vessel_mni_patch_) / np.max(vessel_mni_patch_)  # compute intensity ratio (mean/max) only on vesselMNI patch
                     ratio_global_vessel_mni = np.mean(vessel_mni_patch_) / np.max(vessel_mni_volume_)  # compute intensity ratio (mean/max) on vesselMNI patch wrt entire volume
-                    ratio_local_tof_bet = np.mean(angio_patch_after_bet_scale_1_) / np.max(angio_patch_after_bet_scale_1_)  # compute local intensity ratio (mean/max) on bet_tof
-                    ratio_global_tof_bet = np.mean(angio_patch_after_bet_scale_1_) / np.max(nii_volume_)  # compute global intensity ratio (mean/max) on bet_tof
+                    ratio_local_tof_bet = np.mean(angio_patch_after_bet) / np.max(angio_patch_after_bet)  # compute local intensity ratio (mean/max) on bet_tof
+                    ratio_global_tof_bet = np.mean(angio_patch_after_bet) / np.max(nii_volume_)  # compute global intensity ratio (mean/max) on bet_tof
 
                     # UNCOMMENT lines below for debugging
                     # print("ratio_local_vessel_mni = {}".format(ratio_local_vessel_mni))
@@ -367,19 +371,20 @@ def extracting_conditions_are_met(angio_patch_after_bet_scale_1_: np.ndarray,
                     # print("count_nonzero vessel_mni = {}\n".format(np.count_nonzero(vessel_mni_patch_)))
 
                     if ratio_local_vessel_mni > intensity_thresholds[0] and ratio_global_vessel_mni > intensity_thresholds[1] and \
-                            ratio_local_tof_bet > intensity_thresholds[2] and ratio_global_tof_bet > intensity_thresholds[3] and np.count_nonzero(vessel_mni_patch_) > intensity_thresholds[4]:
+                            ratio_local_tof_bet > intensity_thresholds[2] and ratio_global_tof_bet > intensity_thresholds[3] and\
+                            np.count_nonzero(vessel_mni_patch_) > intensity_thresholds[4]:
 
                         if distance_is_plausible(patch_center_coordinates_physical_space, df_landmarks_tof_space, distances_thresholds):
                             conditions_fulfilled = True
 
-        # if instead the registration is not accurate enough, disregard registration conditions and only check intensity conditions
+        # if instead the registration is not accurate enough, disregard registration conditions and only check intensity conditions of angio (and not registered vessel atlas which is probably wrong)
         else:
-            # if the small-scale angio patch is not empty
-            if np.count_nonzero(angio_patch_after_bet_scale_1_) != 0:
+            # if the angio patch is not empty
+            if np.count_nonzero(angio_patch_after_bet) != 0:
                 # to avoid division by 0, first check that denominator is != 0 and there are no NaNs
-                if not math.isnan(np.mean(angio_patch_after_bet_scale_1_)):
-                    ratio_local_tof_bet = np.mean(angio_patch_after_bet_scale_1_) / np.max(angio_patch_after_bet_scale_1_)  # compute local intensity ratio (mean/max) on bet_tof
-                    ratio_global_tof_bet = np.mean(angio_patch_after_bet_scale_1_) / np.max(nii_volume_)  # compute global intensity ratio (mean/max) on bet_tof
+                if not math.isnan(np.mean(angio_patch_after_bet)):
+                    ratio_local_tof_bet = np.mean(angio_patch_after_bet) / np.max(angio_patch_after_bet)  # compute local intensity ratio (mean/max) on bet_tof
+                    ratio_global_tof_bet = np.mean(angio_patch_after_bet) / np.max(nii_volume_)  # compute global intensity ratio (mean/max) on bet_tof
 
                     # UNCOMMENT lines below for debugging
                     # print(ratio_local_tof_bet)
@@ -390,26 +395,26 @@ def extracting_conditions_are_met(angio_patch_after_bet_scale_1_: np.ndarray,
                         conditions_fulfilled = True
 
     else:  # if instead we just do a brute-force sliding-window (i.e. not anatomically-informed) --> just take all the patches that have non-zero voxels and the correct shape
-        # if the small-scale angio patch is not empty
-        if np.count_nonzero(angio_patch_after_bet_scale_1_) != 0 and angio_patch_after_bet_scale_1_.shape == (patch_side_scale_1, patch_side_scale_1, patch_side_scale_1):
+        # if the angio patch is not empty
+        if np.count_nonzero(angio_patch_after_bet) != 0 and angio_patch_after_bet.shape == (patch_side_scale_1, patch_side_scale_1, patch_side_scale_1):
             conditions_fulfilled = True
 
     return conditions_fulfilled
 
 
-def create_tf_dataset(all_angio_patches_scale_1_numpy_list_: list,
+def create_tf_dataset(all_angio_patches_numpy_list: list,
                       unet_batch_size: int) -> tf.data.Dataset:
-    """This function creates a batched tf.data.Dataset from lists of numpy arrays containing small-scale tof and labels.
+    """This function creates a batched tf.data.Dataset from lists of numpy arrays containing TOF patches.
     Args:
-        all_angio_patches_scale_1_numpy_list_: list containing all small_scale angio patches
+        all_angio_patches_numpy_list: list containing all small_scale angio patches
         unet_batch_size: batch size. Not really relevant (cause we're doing inference), but still needed
     Returns:
         batched_dataset_: batched dataset containing all samples and labels
     """
-    all_patch_volumes_tensors_ = tf.convert_to_tensor(all_angio_patches_scale_1_numpy_list_, dtype=tf.float32)  # convert from list of numpy arrays to tf.Tensor
+    all_patch_volumes_tensors = tf.convert_to_tensor(all_angio_patches_numpy_list, dtype=tf.float32)  # convert from list of numpy arrays to tf.Tensor
 
     # CREATE tf.data.Dataset (since we are doing inference, there are no labels)
-    dataset = tf.data.Dataset.from_tensor_slices(all_patch_volumes_tensors_)
+    dataset = tf.data.Dataset.from_tensor_slices(all_patch_volumes_tensors)
 
     # DIVIDE dataset into batches (only needed for dim. compatibility, but not very relevant since we are doing just inference and not training again)
     batched_dataset_ = dataset.batch(unet_batch_size)
@@ -439,7 +444,7 @@ def save_volume_mask_to_disk(input_volume: np.ndarray,
     elif output_dtype == "int32":
         input_volume = np.int32(input_volume)  # cast to int32
     else:
-        raise ValueError("Only float32 and int32 are allowed as output_dtype; got {} instead".format(output_dtype))
+        raise ValueError(f"Only float32 and int32 are allowed as output_dtype; got {output_dtype} instead")
 
     volume_obj = nib.Nifti1Image(input_volume, nii_aff)  # convert from numpy to nib object
 
@@ -481,7 +486,7 @@ def reduce_fp_in_segm_map(txt_file_path: str,
         # sanity check: control that we have same number of connected components
         labels_out = cc3d.connected_components(np.asarray(new_segm_map, dtype=int))  # extract 3D connected components
         numb_labels = np.max(labels_out)  # extract number of different connected components found
-        assert numb_labels == df_txt_file.shape[0], "Mismatch between output files: {} connected components and {} centers".format(numb_labels, df_txt_file.shape[0])
+        assert numb_labels == df_txt_file.shape[0], f"Mismatch between output files: {numb_labels} connected components and {df_txt_file.shape[0]} centers"
 
         # OVERWRITE previous binary mask
         save_volume_mask_to_disk(new_segm_map, output_folder_path, binary_segm_map_obj.affine, out_filename, output_dtype="int32")
@@ -556,7 +561,7 @@ def create_second_txt_output_file_with_average_brightness(txt_file_path: str,
                 # write center + count_nonzero_voxels + avg. brightness to disk as a row
                 wr_centers_plus_brightness.writerow(np.asarray(pred_center_plus_count_nonzero_plus_average_brightness, dtype=int))
 
-    assert os.path.exists(second_txt_path), "Path {} does not exist".format(second_txt_path)
+    assert os.path.exists(second_txt_path), f"Path {second_txt_path} does not exist"
 
     return second_txt_path
 
@@ -730,7 +735,7 @@ def reduce_false_positives(txt_file_path: str,
     Raises:
         AssertionError: if path to .txt file does not exist
     """
-    assert os.path.exists(txt_file_path), "Path {} does not exist".format(txt_file_path)
+    assert os.path.exists(txt_file_path), f"Path {txt_file_path} does not exist"
     if not os.stat(txt_file_path).st_size == 0:  # if the output file is not empty (i.e. there's at least one predicted aneurysm location)
         df_txt_file = pd.read_csv(txt_file_path, header=None)  # type: pd.DataFrame # load txt file with pandas
         reduced_centers = []  # type: list # will contain the max_fp most probable (highest brightness) centers
@@ -968,7 +973,7 @@ def create_output_folder(batched_ds: tf.data.Dataset,
         # print_running_time(start_out_dir, end_out_dir, "Output dir creation {}".format(sub_ses))
 
     elif len(patch_center_coords) == 0:
-        print("WARNING: no patch was retained for {}; predicting empty segmentation volume".format(sub_ses))
+        print(f"WARNING: no patch was retained for {sub_ses}; predicting empty segmentation volume")
         # create empty segmentation map of entire volume
         segm_map_resampled = np.zeros(resampled_nii_volume_after_bet.shape, dtype=np.float32)  # type: np.ndarray
 
@@ -976,22 +981,27 @@ def create_output_folder(batched_ds: tf.data.Dataset,
         save_output_mask_and_output_location(segm_map_resampled, output_folder_path_, aff_mat_resampled, orig_bfc_angio_sitk, tmp_path,
                                              txt_file_path, original_bet_bfc_angio, remove_dark_fp, reduce_fp, max_fp, dark_fp_threshold)
     else:
-        raise ValueError("Unexpected value for len(patch_center_coords): {}".format(len(patch_center_coords)))
+        raise ValueError(f"Unexpected value for len(patch_center_coords): {len(patch_center_coords)}")
 
 
-def check_registration_quality(quality_metrics_thresholds: tuple,
-                               sub_quality_metrics: tuple) -> bool:
+def check_registration_quality(quality_metrics_thresholds: dict,
+                               struct_2_tof_nc: float,
+                               struct_2_tof_mi: float,
+                               mni_2_struct_nc: float,
+                               mni_2_struct_2_mi: float) -> bool:
     """This function checks whether the registration was correct or not for the subject being evaluated.
     Args:
         quality_metrics_thresholds: registration quality metrics; specifically, it contains (p3_neigh_corr_struct_2_tof, p97_mut_inf_struct_2_tof)
-        sub_quality_metrics: it contains the registration quality metrics for the subject being evaluated; specifically, (struct_2_tof_nc, struct_2_tof_mi)
+        struct_2_tof_nc: it contains the registration quality metrics for the subject being evaluated; specifically, struct_2_tof_nc
+        struct_2_tof_mi: it contains the registration quality metrics for the subject being evaluated; specifically, struct_2_tof_mi
+        mni_2_struct_nc: it contains the registration quality metrics for the subject being evaluated; specifically, mni_2_struct_nc
+        mni_2_struct_2_mi: it contains the registration quality metrics for the subject being evaluated; specifically, mni_2_struct_mi
     Returns:
         registration_accurate_enough: it indicates whether the registration accuracy is high enough to perform the anatomically-informed sliding window
     """
     registration_accurate_enough = False
 
-    # if the reg_metrics of this subject are not outliers, then the registration was most probably correct
-    if sub_quality_metrics[0] > quality_metrics_thresholds[0] and sub_quality_metrics[1] < quality_metrics_thresholds[1]:
+    if struct_2_tof_mi > quality_metrics_thresholds["struct_2_tof_mi"]:
         registration_accurate_enough = True
 
     return registration_accurate_enough
@@ -1296,7 +1306,7 @@ def compute_patient_wise_metrics(out_dir: str,
 
     # ----------- merge metrics together -----------
     out_list = [sensitivity, false_positive_count, dsc, h95, vs]  # type: list
-    out_metrics = pd.DataFrame([out_list], columns=["Sens", "FP count", "DSC", "HD95", "VS"], index=["{}_{}".format(sub, ses)])  # type: pd.DataFrame
+    out_metrics = pd.DataFrame([out_list], columns=["Sens", "FP count", "DSC", "HD95", "VS"], index=[f"{sub}_{ses}"])  # type: pd.DataFrame
 
     return out_metrics
 
@@ -1313,13 +1323,13 @@ def save_and_print_results(metrics_cv_fold: list,
     # create unique dataframe with the metrics of all subjects
     out_metrics_df = pd.concat(metrics_cv_fold)
     # save output dataframe to disk
-    out_metrics_df.to_csv(os.path.join(inference_outputs_path, "all_folds_out_metrics_{}.csv".format(out_date)))
+    out_metrics_df.to_csv(os.path.join(inference_outputs_path, f"all_folds_out_metrics_{out_date}.csv"))
 
     # uncomment print below for debugging
     # print(out_metrics_df)
 
     print("\n---------------------------")
-    print("CUMULATIVE PERFORMANCES OVER {} subjects".format(out_metrics_df.shape[0]))
+    print(f"CUMULATIVE PERFORMANCES OVER {out_metrics_df.shape[0]} subjects")
     print("Average Sensitivity: {:.3f}".format(out_metrics_df["Sens"].mean()))
     print("False Positives: {} (avg: {:.1f} per subject)".format(out_metrics_df["FP count"].sum(), out_metrics_df["FP count"].mean()))
     print("Average DSC: {:.3f}".format(out_metrics_df["DSC"].mean()))
@@ -1403,7 +1413,7 @@ def convert_mni_to_angio(df_landmarks: pd.DataFrame,
 
         # UNCOMMENT lines below for DEBUGGING
         # landmark_voxel_coord_tof = bfc_angio_volume_sitk.TransformPhysicalPointToIndex(landmark_mm_coord_tof)
-        # print("DEBUG: landmark TOF voxel coord = {}".format(landmark_voxel_coord_tof))
+        # print(f"DEBUG: landmark TOF voxel coord = {landmark_voxel_coord_tof}")
 
     df_landmark_points_tof_physical_space = pd.DataFrame(landmark_points_tof_physical_space, columns=["x", "y", "z"])  # type: pd.DataFrame # convert from list to dataframe
 
@@ -1441,24 +1451,24 @@ def extract_distance_one_aneurysm(subdir: str,
     assert len(lesion_name) != 0, "Lesion name not found"
 
     # uncomment line below for debugging
-    # print("{}_{}_{}".format(sub, ses, lesion_name))
+    # print(f"{sub}_{ses}_{lesion_name}")
 
     # if we are NOT dealing with a treated aneurysm
     if "Treated" not in lesion_name:
 
         registration_params_dir = os.path.join(bids_path, "derivatives", "registrations", "reg_params")
-        assert os.path.exists(registration_params_dir), "Path {} does not exist".format(registration_params_dir)
+        assert os.path.exists(registration_params_dir), f"Path {registration_params_dir} does not exist"
         bfc_derivatives_dir = os.path.join(bids_path, "derivatives", "N4_bias_field_corrected")
-        assert os.path.exists(bfc_derivatives_dir), "Path {} does not exist".format(bfc_derivatives_dir)  # make sure that path exists
+        assert os.path.exists(bfc_derivatives_dir), f"Path {bfc_derivatives_dir} does not exist"  # make sure that path exists
 
         if "ADAM" in bfc_derivatives_dir:
-            bet_angio_bfc_path = os.path.join(bfc_derivatives_dir, sub, ses, "anat", "{}_{}_desc-angio_N4bfc_brain_mask_ADAM.nii.gz".format(sub, ses))  # type: str # save path of angio brain after Brain Extraction Tool (BET)
+            bet_angio_bfc_path = os.path.join(bfc_derivatives_dir, sub, ses, "anat", f"{sub}_{ses}_desc-angio_N4bfc_brain_mask_ADAM.nii.gz")  # type: str # save path of angio brain after Brain Extraction Tool (BET)
         else:
-            bet_angio_bfc_path = os.path.join(bfc_derivatives_dir, sub, ses, "anat", "{}_{}_desc-angio_N4bfc_brain_mask.nii.gz".format(sub, ses))  # type: str # save path of angio brain after Brain Extraction Tool (BET)
-        assert os.path.exists(bet_angio_bfc_path), "Path {} does not exist".format(bet_angio_bfc_path)  # make sure that path exists
+            bet_angio_bfc_path = os.path.join(bfc_derivatives_dir, sub, ses, "anat", f"{sub}_{ses}_desc-angio_N4bfc_brain_mask.nii.gz")  # type: str # save path of angio brain after Brain Extraction Tool (BET)
+        assert os.path.exists(bet_angio_bfc_path), f"Path {bet_angio_bfc_path} does not exist"  # make sure that path exists
 
         # since we are running patients in parallel, we must create separate tmp folders, otherwise we risk to overwrite/overload files of other subjects
-        tmp_folder = os.path.join(out_dir, "tmp_{}_{}_{}_pos_patches".format(sub, ses, lesion_name))
+        tmp_folder = os.path.join(out_dir, f"tmp_{sub}_{ses}_{lesion_name}_pos_patches")
         create_dir_if_not_exist(tmp_folder)  # if directory does not exist, create it
 
         # retrieve useful registration parameters by invoking dedicated function
@@ -1506,7 +1516,7 @@ def extract_distance_one_aneurysm(subdir: str,
                                                                 z_min,
                                                                 z_max)
 
-                    # ensure that the evaluated patch is not out of bound by using small scale
+                    # ensure that the evaluated patch is not out of bound
                     if i - shift_scale_1 >= 0 and i + shift_scale_1 < rows_range and j - shift_scale_1 >= 0 and j + shift_scale_1 < columns_range and k - shift_scale_1 >= 0 and k + shift_scale_1 < slices_range:
                         if overlap_flag != 0:  # if the patch contains an aneurysm
                             cnt_positive_patches += 1  # increment counter
@@ -1520,7 +1530,7 @@ def extract_distance_one_aneurysm(subdir: str,
                                 eucl_distance = np.linalg.norm(patch_center_tof_physical_space - landmark_point_tof_physical_space)  # type: float # compute euclidean distance in TOF physical space
                                 all_distances.append(eucl_distance)
         if cnt_positive_patches == 0:
-            print("WARNING: There should be at least one patch containing the aneurysm; found 0 for {}_{}_{}".format(sub, ses, lesion_name))
+            print(f"WARNING: There should be at least one patch containing the aneurysm; found 0 for {sub}_{ses}_{lesion_name}")
         # -------------------------------------------------------------------------------------
         # remove temporary folder for this subject
         if os.path.exists(tmp_folder) and os.path.isdir(tmp_folder):
@@ -1537,7 +1547,7 @@ def extract_distance_one_aneurysm(subdir: str,
 
 
 def extract_distance_thresholds(bids_ds_path: str,
-                                reg_quality_metrics_threshold: tuple,
+                                reg_quality_metrics_threshold: dict,
                                 sub_ses_test: list,
                                 n_parallel_jobs: int,
                                 overlapping: float,
@@ -1572,10 +1582,14 @@ def extract_distance_thresholds(bids_ds_path: str,
             if "Lesion" in file and ext == ext_gz and "registrations" not in subdir and "Treated" not in file:  # if we're dealing with the aneurysm volume
                 sub = re.findall(r"sub-\d+", subdir)[0]
                 ses = re.findall(r"ses-\w{6}\d+", subdir)[0]  # extract ses
-                sub_ses = "{}_{}".format(sub, ses)
+                sub_ses = f"{sub}_{ses}"
                 if sub_ses not in sub_ses_test:  # only use training sub_ses otherwise we might introduce a bias towards the locations of the aneurysms in the test set
-                    sub_quality_metrics = extract_reg_quality_metrics_one_sub(os.path.join(registration_metrics_dir, sub, ses))  # type: tuple
-                    registration_accurate_enough = check_registration_quality(reg_quality_metrics_threshold, sub_quality_metrics)  # type: bool
+                    struct_2_tof_nc, struct_2_tof_mi, mni_2_struct_nc, mni_2_struct_2_mi = extract_reg_quality_metrics_one_sub(os.path.join(registration_metrics_dir, sub, ses))
+                    registration_accurate_enough = check_registration_quality(reg_quality_metrics_threshold,
+                                                                              struct_2_tof_nc,
+                                                                              struct_2_tof_mi,
+                                                                              mni_2_struct_nc,
+                                                                              mni_2_struct_2_mi)  # type: bool
                     # only compute distances for subjects with correct registration
                     if registration_accurate_enough:
                         all_subdirs.append(subdir)
@@ -1617,15 +1631,15 @@ def extract_dark_fp_threshold_one_aneurysm(subdir: str,
     """
     sub = re.findall(r"sub-\d+", subdir)[0]
     ses = re.findall(r"ses-\w{6}\d+", subdir)[0]  # extract ses
-    # print("{}_{}".format(sub, ses))
+    # print(f"{sub}_{ses}")
     bfc_derivatives_dir = os.path.join(bids_dir, "derivatives", "N4_bias_field_corrected")
-    assert os.path.exists(bfc_derivatives_dir), "Path {} does not exist".format(bfc_derivatives_dir)  # make sure that path exists
+    assert os.path.exists(bfc_derivatives_dir), f"Path {bfc_derivatives_dir} does not exist"  # make sure that path exists
 
     if "ADAM" in bfc_derivatives_dir:
-        bet_angio_bfc_path = os.path.join(bfc_derivatives_dir, sub, ses, "anat", "{}_{}_desc-angio_N4bfc_brain_mask_ADAM.nii.gz".format(sub, ses))  # type: str # save path of angio brain after Brain Extraction Tool (BET)
+        bet_angio_bfc_path = os.path.join(bfc_derivatives_dir, sub, ses, "anat", f"{sub}_{ses}_desc-angio_N4bfc_brain_mask_ADAM.nii.gz")  # type: str # save path of angio brain after Brain Extraction Tool (BET)
     else:
-        bet_angio_bfc_path = os.path.join(bfc_derivatives_dir, sub, ses, "anat", "{}_{}_desc-angio_N4bfc_brain_mask.nii.gz".format(sub, ses))  # type: str # save path of angio brain after Brain Extraction Tool (BET)
-    assert os.path.exists(bet_angio_bfc_path), "Path {} does not exist".format(bet_angio_bfc_path)  # make sure that path exists
+        bet_angio_bfc_path = os.path.join(bfc_derivatives_dir, sub, ses, "anat", f"{sub}_{ses}_desc-angio_N4bfc_brain_mask.nii.gz")  # type: str # save path of angio brain after Brain Extraction Tool (BET)
+    assert os.path.exists(bet_angio_bfc_path), f"Path {bet_angio_bfc_path} does not exist"  # make sure that path exists
 
     bet_angio_bfc_obj = nib.load(bet_angio_bfc_path)  # type: nib.Nifti1Image
     bet_angio_bfc_volume = np.asanyarray(bet_angio_bfc_obj.dataobj)  # type: np.ndarray
@@ -1675,7 +1689,7 @@ def extract_dark_fp_threshold(bids_dir: str,
             if regexp_sub.search(file) and ext == ext_gz and "Lesion" in file and "N4" not in subdir and "registrations" not in subdir and "Treated" not in file:
                 sub = re.findall(r"sub-\d+", subdir)[0]
                 ses = re.findall(r"ses-\w{6}\d+", subdir)[0]  # extract ses
-                sub_ses = "{}_{}".format(sub, ses)
+                sub_ses = f"{sub}_{ses}"
                 if sub_ses not in sub_ses_test:  # only use training sub_ses otherwise we might introduce a bias towards the intensities of the aneurysms in the test set
                     all_subdirs.append(subdir)
                     all_files.append(file)
@@ -1768,7 +1782,7 @@ def load_file_from_disk(file_path: str) -> Any:
     Returns:
         sub_ses_test (*): loaded file; it can be a list, a dict, etc.
     """
-    assert os.path.exists(file_path), "Path {} does not exist".format(file_path)
+    assert os.path.exists(file_path), f"Path {file_path} does not exist"
     open_file = open(file_path, "rb")
     sub_ses_test = pickle.load(open_file)
     open_file.close()
@@ -1834,10 +1848,10 @@ def check_output_consistency_between_detection_and_segmentation(output_folder: s
     if not os.stat(txt_file_path).st_size == 0:  # if the output file is not empty (i.e. there's at least one predicted aneurysm location)
         df_txt_file = pd.read_csv(txt_file_path, header=None)  # type: pd.DataFrame # load txt file with pandas
         if df_txt_file.shape[0] != numb_labels:
-            print("\nWARNING for {}_{}: mismatch between output files: {} centers vs. {} connected components".format(sub, ses, df_txt_file.shape[0], numb_labels))
+            print(f"\nWARNING for {sub}_{ses}: mismatch between output files: {df_txt_file.shape[0]} centers vs. {numb_labels} connected components")
     else:  # if instead the txt file is empty
         if numb_labels != 0:
-            print("\nWARNING for {}_{}: there shouldn't be any connected component; found {} instead".format(sub, ses, numb_labels))
+            print(f"\nWARNING for {sub}_{ses}: there shouldn't be any connected component; found {numb_labels} instead")
 
 
 def sanity_check_inputs(unet_patch_side: int,
