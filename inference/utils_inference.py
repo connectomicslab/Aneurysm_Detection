@@ -897,6 +897,9 @@ def create_output_folder(batched_ds: tf.data.Dataset,
 
     create_dir_if_not_exist(output_folder_path_)  # if output path does not exist, create it
 
+    # define path of txt file; it will be used later
+    txt_file_path = os.path.join(output_folder_path_, "result.txt")
+
     # if at least one patch was retained
     if len(patch_center_coords) > 0:
 
@@ -921,7 +924,6 @@ def create_output_folder(batched_ds: tf.data.Dataset,
             voxel_dimensions = (nii_volume_obj_after_bet_resampled.header["pixdim"])[1:4]  # extract voxel size to later compute the volume
             voxel_volume = np.prod(voxel_dimensions)
 
-        txt_file_path = os.path.join(output_folder_path_, "result.txt")
         # loop over all the anatomically-plausible patches that were retained in the sliding-window approach
         for index, pred_patch in enumerate(pred_patches):
 
@@ -979,7 +981,6 @@ def create_output_folder(batched_ds: tf.data.Dataset,
         # create empty segmentation map of entire volume
         segm_map_resampled = np.zeros(resampled_nii_volume_after_bet.shape, dtype=np.float32)  # type: np.ndarray
 
-        txt_file_path = os.path.join(output_folder_path_, "result.txt")
         save_output_mask_and_output_location(segm_map_resampled, output_folder_path_, aff_mat_resampled, orig_bfc_angio_sitk, tmp_path,
                                              txt_file_path, original_bet_bfc_angio, remove_dark_fp, reduce_fp, max_fp, dark_fp_threshold)
     else:
