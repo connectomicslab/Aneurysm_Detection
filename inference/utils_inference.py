@@ -963,6 +963,8 @@ def create_output_folder(batched_ds: tf.data.Dataset,
                                           center_tof_space[1] - shift_scale_1:center_tof_space[1] + shift_scale_1,
                                           center_tof_space[2] - shift_scale_1:center_tof_space[2] + shift_scale_1] += binary_largest_conn_comp
 
+        # ---------- END of loop over all retained patches of the sliding-window
+
         # average overlapping predictions (if there were any); divide only for non-zero voxels in order to avoid divisions by 0
         segm_map_resampled_avg = np.divide(segm_map_resampled, overlap_map_resampled, out=np.zeros_like(segm_map_resampled), where=overlap_map_resampled != 0)
 
