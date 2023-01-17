@@ -199,9 +199,15 @@ def load_nifti_and_resample(volume_path: str,
 
     out_path = os.path.join(tmp_folder, out_name)
     if binary_mask:  # if the volume is a mask, use near.neighbor interpolator in order not to create new connected components
-        resampled_volume_obj_sitk, resampled_volume_obj_nib, resampled_volume = resample_volume(volume_path, new_spacing, out_path, interpolator=sitk.sitkNearestNeighbor)
+        resampled_volume_obj_sitk, resampled_volume_obj_nib, resampled_volume = resample_volume(volume_path,
+                                                                                                new_spacing,
+                                                                                                out_path,
+                                                                                                interpolator=sitk.sitkNearestNeighbor)
     else:  # instead, if it's a normal nifti volume, use linear interpolator
-        resampled_volume_obj_sitk, resampled_volume_obj_nib, resampled_volume = resample_volume(volume_path, new_spacing, out_path, interpolator=sitk.sitkLinear)
+        resampled_volume_obj_sitk, resampled_volume_obj_nib, resampled_volume = resample_volume(volume_path,
+                                                                                                new_spacing,
+                                                                                                out_path,
+                                                                                                interpolator=sitk.sitkLinear)
     assert len(resampled_volume.shape) == 3, "Nifti volume is not 3D"
     aff_matrix = resampled_volume_obj_nib.affine  # extract and save affine matrix
 
@@ -566,7 +572,7 @@ def create_second_txt_output_file_with_average_brightness(txt_file_path: str,
     return second_txt_path
 
 
-def save_txt_plus_mapping_centers_nonzero_voxels_plus_avg_brightness(extracted_image: np.ndarray,
+def save_txt_plus_mapping_centers_nonzero_voxels_plus_avg_brightness(one_probab_conn_component: np.ndarray,
                                                                      wr: csv.writer,
                                                                      mapping_centers_nonzero_coords: dict,
                                                                      mapping_centers_avg_brightness: dict,
@@ -577,7 +583,7 @@ def save_txt_plus_mapping_centers_nonzero_voxels_plus_avg_brightness(extracted_i
     also updates the dict that contains as keys the prediction centers and as values the average intensity of each precision (i.e. of each
     connected component). Plus it updates the dict that contains as keys the prediction centers and as values the count of nonzero voxels.
     Args:
-        extracted_image: the output segmentation volume with only one probabilistic prediction (i.e. one probabilistic connected component)
+        one_probab_conn_component: the output segmentation volume with only one probabilistic prediction (i.e. one probabilistic connected component)
         wr: the writer that we use to save the center of mass of each prediction
         mapping_centers_nonzero_coords: dict that has as keys the prediction centers and as values the coordinates of the nonzero voxels of each connected component
         mapping_centers_avg_brightness: dict that has as keys the prediction centers and as values the average intensity of each connected component
@@ -588,7 +594,7 @@ def save_txt_plus_mapping_centers_nonzero_voxels_plus_avg_brightness(extracted_i
         mapping_centers_count_nonzero_voxels: the updated dict
     """
     # extract voxel coordinates of the center of the predicted lesion (i.e. of this connected component)
-    predicted_center = center_of_mass(extracted_image)  # type: tuple
+    predicted_center = center_of_mass(one_probab_conn_component)  # type: tuple
     # round to closest int
     pred_center_tof_space = [round_half_up(x) for x in predicted_center]  # type: list
     # cast to int
@@ -597,14 +603,14 @@ def save_txt_plus_mapping_centers_nonzero_voxels_plus_avg_brightness(extracted_i
     wr.writerow(pred_center_tof_space_int)
 
     # update mapping; it contains the centers of the predictions as keys and the coordinates of non-zero voxels as values
-    mapping_centers_nonzero_coords[tuple(pred_center_tof_space_int)] = np.nonzero(extracted_image)
+    mapping_centers_nonzero_coords[tuple(pred_center_tof_space_int)] = np.nonzero(one_probab_conn_component)
 
     # compute average intensity of non-zero voxels for this predicted aneurysm (i.e. for this connected component)
-    avg_brightness_prob_larg_conn_comp = np.mean(extracted_image[np.nonzero(extracted_image)])
+    avg_brightness_prob_larg_conn_comp = np.mean(one_probab_conn_component[np.nonzero(one_probab_conn_component)])
     mapping_centers_avg_brightness[tuple(pred_center_tof_space_int)] = avg_brightness_prob_larg_conn_comp
 
     # update mapping that counts the number of nonzero voxels per connected component
-    mapping_centers_count_nonzero_voxels[tuple(pred_center_tof_space_int)] = np.count_nonzero(extracted_image)
+    mapping_centers_count_nonzero_voxels[tuple(pred_center_tof_space_int)] = np.count_nonzero(one_probab_conn_component)
 
     return mapping_centers_nonzero_coords, mapping_centers_avg_brightness, mapping_centers_count_nonzero_voxels
 
@@ -637,7 +643,7 @@ def create_txt_output_file_and_remove_dark_fp(probabilistic_output_volume_path: 
     labels_out = cc3d.connected_components(binary_output_segm_map)  # create volume with connected components
     numb_labels = np.max(labels_out)  # compute number of different connected components found
 
-    # create output txt file
+    # create first txt output file that only contains the i,j,k center coordinates of the connected components
     with open(txt_file_path, "w") as txt_file:
         wr_centers = csv.writer(txt_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)  # type: csv.writer
         mapping_centers_avg_brightness = {}  # type: dict # create a map between a predicted center and its corresponding mean brightness; will be used later for FP reduction
@@ -646,14 +652,14 @@ def create_txt_output_file_and_remove_dark_fp(probabilistic_output_volume_path: 
         # loop over different conn. components
         for seg_id in range(1, numb_labels + 1):
             # extract one connected component from the probabilistic predicted volume
-            extracted_image = probabilistic_out_segm_map * (labels_out == seg_id)
-            # extract the same connected component but from original bias-field-corrected tof volume after brain extraction
-            extracted_original_bet_tof = original_bfc_bet_tof * (labels_out == seg_id)
-            assert extracted_image.shape == extracted_original_bet_tof.shape
-            assert np.max(extracted_image) <= 1, "This should be a probabilistic map with values between 0 and 1"
+            one_probab_conn_component = probabilistic_out_segm_map * (labels_out == seg_id)
+            assert np.max(one_probab_conn_component) <= 1, "This should be a probabilistic map with values between 0 and 1"
 
             if remove_dark_fp:
                 p90 = np.percentile(original_bfc_bet_tof, [90])[0]  # find xxth intensity percentile for this subject
+                # extract the same connected component but from original bias-field-corrected tof volume after brain extraction
+                extracted_original_bet_tof = original_bfc_bet_tof * (labels_out == seg_id)
+                assert one_probab_conn_component.shape == extracted_original_bet_tof.shape
                 # only retain non-zero voxels (i.e. voxels belonging to the aneurysm mask)
                 non_zero_voxels_intensities = extracted_original_bet_tof[np.nonzero(extracted_original_bet_tof)]  # type: np.ndarray
                 # compute ratio between mean intensity of predicted aneurysm voxels and the xxth intensity percentile of the entire skull-stripped image
@@ -661,7 +667,7 @@ def create_txt_output_file_and_remove_dark_fp(probabilistic_output_volume_path: 
                 if intensity_ratio > dark_fp_threshold:
 
                     mapping_centers_nonzero_coords, mapping_centers_avg_brightness,\
-                        mapping_centers_count_nonzero_voxels = save_txt_plus_mapping_centers_nonzero_voxels_plus_avg_brightness(extracted_image,
+                        mapping_centers_count_nonzero_voxels = save_txt_plus_mapping_centers_nonzero_voxels_plus_avg_brightness(one_probab_conn_component,
                                                                                                                                 wr_centers,
                                                                                                                                 mapping_centers_nonzero_coords,
                                                                                                                                 mapping_centers_avg_brightness,
@@ -670,7 +676,7 @@ def create_txt_output_file_and_remove_dark_fp(probabilistic_output_volume_path: 
             # if instead we do not discard dark fp predictions
             else:
                 mapping_centers_nonzero_coords, mapping_centers_avg_brightness,\
-                    mapping_centers_count_nonzero_voxels = save_txt_plus_mapping_centers_nonzero_voxels_plus_avg_brightness(extracted_image,
+                    mapping_centers_count_nonzero_voxels = save_txt_plus_mapping_centers_nonzero_voxels_plus_avg_brightness(one_probab_conn_component,
                                                                                                                             wr_centers,
                                                                                                                             mapping_centers_nonzero_coords,
                                                                                                                             mapping_centers_avg_brightness,
@@ -974,7 +980,7 @@ def create_output_folder(batched_ds: tf.data.Dataset,
                                              txt_file_path, original_bet_bfc_angio, remove_dark_fp, reduce_fp, max_fp, dark_fp_threshold)
 
         # end_out_dir = time.time()
-        # print_running_time(start_out_dir, end_out_dir, "Output dir creation {}".format(sub_ses))
+        # print_running_time(start_out_dir, end_out_dir, f"Output dir creation {sub_ses}")
 
     elif len(patch_center_coords) == 0:
         print(f"WARNING: no patch was retained for {sub_ses}; predicting empty segmentation volume")
