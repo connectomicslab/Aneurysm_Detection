@@ -16,3 +16,5 @@ In this file, the input parameters of `config_creation_ds_patches.json` are expl
 - `pos_patches (int)`: number of positive patches to extract for each patient (i.e. subject with aneurysm(s))
 - `refine_weak_labels (bool)`: if set to True, the weak labels are refined with an intensity criterion
 - `convert_voxelwise_labels_into_weak (bool)`: if set to True, it converts the voxel-wise labels into weak (i.e. it generates synthetic spheres around the aneurysm center); for more details, please check the creation of *weakened* labels in the paper
+- `sub_ses_test (list)`: it contains the sub_ses of the subjects that will be used for testing. If you're running the cross-validation, then for every fold you should specify the test sub_ses. Instead, if
+you are just performing one train-test split of the dataset, you can just specify the sub_ses of the test subjects
