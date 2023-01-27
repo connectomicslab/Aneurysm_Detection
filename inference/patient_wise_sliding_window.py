@@ -7,8 +7,8 @@ This script performs inference via the sliding-window approach.
 
 import os
 import sys
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # used to remove some tensorflow warnings
-sys.path.append('/home/to5743/aneurysm_project/Aneurysm_Detection/')  # this line is needed on the HPC cluster to recognize the dir as a python package
+PROJECT_HOME = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(PROJECT_HOME) 
 from datetime import datetime
 import re
 from joblib import Parallel, delayed

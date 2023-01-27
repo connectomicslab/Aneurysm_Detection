@@ -9,7 +9,9 @@ are extracted. For patients (subjects with aneurysm(s)), both negative (without 
 import time
 import os
 import sys
-sys.path.append('/home/to5743/aneurysm_project/Aneurysm_Detection/')  # this line is needed on the HPC cluster to recognize the dir as a python package
+
+PROJECT_HOME = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(PROJECT_HOME)  # this line is needed on the HPC cluster to recognize the dir as a python package
 from datetime import datetime
 import re
 from joblib import Parallel, delayed
