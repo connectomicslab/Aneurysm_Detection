@@ -62,20 +62,20 @@ def extract_negative_patches(subdir: str,
         AssertionError: if mni_landmark_points_path does not exist
         AssertionError: if the extension of the files containing the landmark points is not correct
     """
-    assert os.path.exists(bids_dataset_path), "Path {} does not exist".format(bids_dataset_path)  # make sure that path exists
+    assert os.path.exists(bids_dataset_path), f"Path {bids_dataset_path} does not exist"  # make sure that path exists
 
     try:
         os.makedirs(out_dataset_path, exist_ok=True)
-        print("Directory {} created successfully".format(out_dataset_path))
+        print(f"Directory {out_dataset_path} created successfully")
     except OSError as error:
-        print("Directory {} can not be created".format(out_dataset_path))
+        print(f"Directory {out_dataset_path} can not be created")
 
     neg_patches_path = os.path.join(out_dataset_path, "Negative_Patches")  # type: str # create path of folder that will contain the negative patches
     vessel_mni_registration_dir = os.path.join(bids_dataset_path, "derivatives/registrations/vesselMNI_2_angioTOF/")  # type: str
-    assert os.path.exists(vessel_mni_registration_dir), "Path {} does not exist".format(vessel_mni_registration_dir)  # make sure that path exists
+    assert os.path.exists(vessel_mni_registration_dir), f"Path {vessel_mni_registration_dir} does not exist"  # make sure that path exists
     registrations_dir = os.path.join(bids_dataset_path, "derivatives/registrations/reg_params/")
-    assert os.path.exists(registrations_dir), "Path {} does not exist".format(registrations_dir)  # make sure that path exists
-    assert os.path.exists(mni_landmark_points_path), "Path {} does not exist".format(mni_landmark_points_path)
+    assert os.path.exists(registrations_dir), f"Path {registrations_dir} does not exist"  # make sure that path exists
+    assert os.path.exists(mni_landmark_points_path), f"Path {mni_landmark_points_path} does not exist"
     _, ext_ = os.path.splitext(mni_landmark_points_path)  # extract extension
     assert ext_ == ".csv", "File containing landmark points must have .csv extension"
 
@@ -84,12 +84,12 @@ def extract_negative_patches(subdir: str,
     ses = re.findall(r"ses-\w{6}\d+", subdir)[0]  # extract ses
 
     # create tmp folder where we save temporary files (this folder will be deleted at the end)
-    tmp_folder = os.path.join(out_dataset_path, "tmp_{}_{}_neg_patches".format(sub, ses))
+    tmp_folder = os.path.join(out_dataset_path, f"tmp_{sub}_{ses}_neg_patches")
     create_dir_if_not_exist(tmp_folder)
 
     # save path of original angio path before BET
     if "ADAM" in subdir:
-        original_angio_volume_path = os.path.join(bids_dataset_path, sub, ses, "anat", "{}_{}_angio_ADAM.nii.gz".format(sub, ses))
+        original_angio_volume_path = os.path.join(bids_dataset_path, sub, ses, "anat", f"{sub}_{ses}_angio_ADAM.nii.gz")
     else:
         original_angio_volume_path = os.path.join(bids_dataset_path, sub, ses, "anat", "{}_{}_angio.nii.gz".format(sub, ses))
     assert os.path.exists(original_angio_volume_path), "Path {} does not exist".format(original_angio_volume_path)
@@ -204,9 +204,9 @@ def extract_positive_patches(subdir: str,
         os.makedirs(out_dataset_path)  # create data_set folder with today's date in the filename
         print("\nCreated Data Set Folder\n")
 
-    assert os.path.exists(bids_dataset_path), "Path {} does not exist".format(bids_dataset_path)  # make sure that path exists
+    assert os.path.exists(bids_dataset_path), f"Path {bids_dataset_path} does not exist"  # make sure that path exists
     bias_field_corrected_folders = os.path.join(bids_dataset_path, "derivatives", "N4_bias_field_corrected")
-    assert os.path.exists(bias_field_corrected_folders), "path {} does not exist".format(bias_field_corrected_folders)  # make sure that path exists
+    assert os.path.exists(bias_field_corrected_folders), f"Path {bias_field_corrected_folders} does not exist"  # make sure that path exists
 
     shift_scale_1 = patch_side // 2  # define shift of cubic patches
     sub = re.findall(r"sub-\d+", subdir)[0]  # type: str # extract sub
@@ -273,7 +273,11 @@ def extract_positive_patches(subdir: str,
                 if not os.path.exists(pos_patches_masks_path) and not os.path.exists(pos_patch_path) and seed not in seed_ext:  # if folder doesn't exist
                     if big_lesion_flag == 0:  # this if condition will be satisfied at least once (first iteration)
                         # invoke function to shift center coordinates cause we don't want exactly-centered positive patches
-                        x_transl, y_transl, z_transl = randomly_translate_coordinates(shift_=center_coord_shift_scale_1 - sc_shift, center_x=x_center, center_y=y_center, center_z=z_central, seed_=seed)
+                        x_transl, y_transl, z_transl = randomly_translate_coordinates(shift_=center_coord_shift_scale_1 - sc_shift,
+                                                                                      center_x=x_center,
+                                                                                      center_y=y_center,
+                                                                                      center_z=z_central,
+                                                                                      seed_=seed)
                         emergency_exit = 0  # emergency flag to avoid infinite while loop
                         while True:
                             emergency_exit += 1
@@ -292,7 +296,11 @@ def extract_positive_patches(subdir: str,
 
                                     seed = randrange(3000)  # change random seed
                                     # invoke function to shift coordinates with a new random seed
-                                    x_transl, y_transl, z_transl = randomly_translate_coordinates(shift_=center_coord_shift_scale_1 - sc_shift, center_x=x_center, center_y=y_center, center_z=z_central, seed_=seed)
+                                    x_transl, y_transl, z_transl = randomly_translate_coordinates(shift_=center_coord_shift_scale_1 - sc_shift,
+                                                                                                  center_x=x_center,
+                                                                                                  center_y=y_center,
+                                                                                                  center_z=z_central,
+                                                                                                  seed_=seed)
 
                                 # if patch is correct
                                 else:
@@ -337,9 +345,10 @@ def extract_positive_patches(subdir: str,
                             entered = False  # type: bool # dummy boolean variable
                             if not np.array_equal(sc_patch_original, sc_patch_after_bet):  # if part of the lesion is different between original volume and BET volume
                                 # if the lesion was completely excluded by the BET or if we lost more than 10% (i.e. we have less than 90% of the original left) of information due to BET
-                                if np.count_nonzero(sc_patch_after_bet) == 0 or (np.count_nonzero(sc_patch_after_bet) / np.count_nonzero(sc_patch_original)) < 0.9:
-                                    entered = True
-                                    print("Lesion voxels excluded by BET for {}; therefore, extract patch from original volume".format(aneurysm_mask_path))
+                                if np.count_nonzero(sc_patch_original) != 0:  # check to avoid division by 0
+                                    if np.count_nonzero(sc_patch_after_bet) == 0 or (np.count_nonzero(sc_patch_after_bet) / np.count_nonzero(sc_patch_original)) < 0.9:
+                                        entered = True
+                                        print(f"Lesion voxels excluded by BET for {aneurysm_mask_path}; therefore, extract patch from original volume")
 
                             if entered is False:  # if entered is false, the lesion was not excluded by BET, thus we can use the volume after BET
                                 patch_obj_transl_scale_1 = nib.Nifti1Image(patch_after_bet_transl_scale_1, affine=aff_mat_after_bet)  # convert translated patch from numpy array to nibabel object, preserving original affine array
@@ -408,14 +417,14 @@ def create_patch_ds(bids_dataset_path: str,
         convert_voxelwise_labels_into_weak: if set to True, it converts the voxel-wise labels into weak (i.e. it generates synthetic spheres around the aneurysm center)
     """
     # make sure all input paths exist
-    assert os.path.exists(bids_dataset_path), "Path {} does not exist".format(bids_dataset_path)
-    assert os.path.exists(mni_landmark_points_path), "Path {} does not exist".format(mni_landmark_points_path)
-    assert os.path.exists(out_dataset_path), "Path {} does not exist".format(out_dataset_path)
-    assert os.path.exists(subs_chuv_with_weak_labels_path), "Path {} does not exist".format(subs_chuv_with_weak_labels_path)
-    assert os.path.exists(subs_chuv_with_voxelwise_labels_path), "Path {} does not exist".format(subs_chuv_with_voxelwise_labels_path)
+    assert os.path.exists(bids_dataset_path), f"Path {bids_dataset_path} does not exist"
+    assert os.path.exists(mni_landmark_points_path), f"Path {mni_landmark_points_path} does not exist"
+    assert os.path.exists(out_dataset_path), f"Path {out_dataset_path} does not exist"
+    assert os.path.exists(subs_chuv_with_weak_labels_path), f"Path {subs_chuv_with_weak_labels_path} does not exist"
+    assert os.path.exists(subs_chuv_with_voxelwise_labels_path), f"Path {subs_chuv_with_voxelwise_labels_path} does not exist"
 
     date = (datetime.today().strftime('%b_%d_%Y'))  # save today's date
-    dataset_name = "Data_Set_{}_{}".format(date, id_out_dataset)  # create dataset's name
+    dataset_name = f"Data_Set_{date}_{id_out_dataset}"  # create dataset's name
     out_dataset_path = os.path.join(out_dataset_path, dataset_name)
     regexp_sub = re.compile(r'sub')  # create a substring template to match
     ext_gz = '.gz'  # type: str # set zipped files extension
@@ -494,7 +503,7 @@ def create_patch_ds(bids_dataset_path: str,
         for sub_ses_lesion in os.listdir(pos_patches_path):
             sub = re.findall(r"sub-\d+", sub_ses_lesion)[0]  # extract sub
             ses = re.findall(r"ses-\w{6}\d+", sub_ses_lesion)[0]  # extract ses
-            sub_ses = "{}_{}".format(sub, ses)
+            sub_ses = f"{sub}_{ses}"
             # only apply refinement to patients with weak labels (i.e. up to sub-449, because from sub-450 they already have voxel-wise labels)
             if sub_ses in subs_with_weak_labels:
                 # loop over patch_pairs
@@ -558,7 +567,7 @@ def main():
     subs_chuv_with_weak_labels_path = config_dict['subs_chuv_with_weak_labels_path']  # type: str # path to pickle file containin the subjects with weak labels
     subs_chuv_with_voxelwise_labels_path = config_dict['subs_chuv_with_voxelwise_labels_path']  # type: str  # path to pickle file containin the subjects with weak labels
     jobs_in_parallel = config_dict['jobs_in_parallel']  # type: int # nb. jobs to run in parallel (i.e. number of CPU (cores) to use); if set to -1, all available CPUs are used
-    sub_ses_test = config_dict['sub_ses_test']  # type: list
+    sub_ses_test = config_dict['sub_ses_test']  # type: list  # list containing sub_ses that will be used for test; empty by default; must be changed depending on the train-test split that is performed
 
     # ARGS for negative patches
     vessel_like_neg_patches = config_dict['vessel_like_neg_patches']  # type: int # number of vessel-like negative patches to extract
