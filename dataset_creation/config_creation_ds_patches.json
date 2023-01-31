@@ -9,6 +9,7 @@
 	"subs_chuv_with_weak_labels_path": "/Aneurysm_Detection/extra_files/patients_with_weak_labels.pkl",
 	"subs_chuv_with_voxelwise_labels_path": "/Aneurysm_Detection/extra_files/patients_with_voxelwise_labels.pkl",
 	"jobs_in_parallel": 4,
+	"sub_ses_test": [],
 
 	"vessel_like_neg_patches": 20,
 	"random_neg_patches": 10,
