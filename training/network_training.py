@@ -8,8 +8,8 @@ This script performs the training of one fold of the cross-validation
 import os
 import sys
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-PROJECT_HOME = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(PROJECT_HOME) 
+PROJECT_HOME = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # extract directory of PyCharm project
+sys.path.append(PROJECT_HOME)  # this line is needed to recognize the dir as a python package
 import tensorflow as tf
 import time
 from datetime import datetime
