@@ -9,9 +9,8 @@ are extracted. For patients (subjects with aneurysm(s)), both negative (without 
 import time
 import os
 import sys
-
 PROJECT_HOME = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(PROJECT_HOME)  # this line is needed on the HPC cluster to recognize the dir as a python package
+sys.path.append(PROJECT_HOME)
 from datetime import datetime
 import re
 from joblib import Parallel, delayed
