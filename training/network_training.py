@@ -8,7 +8,8 @@ This script performs the training of one fold of the cross-validation
 import os
 import sys
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-sys.path.append('/home/to5743/aneurysm_project/Aneurysm_Detection/')  # this line is needed on the HPC cluster to recognize the dir as a python package
+PROJECT_HOME = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(PROJECT_HOME) 
 import tensorflow as tf
 import time
 from datetime import datetime
