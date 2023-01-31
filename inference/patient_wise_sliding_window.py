@@ -7,8 +7,8 @@ This script performs inference via the sliding-window approach.
 
 import os
 import sys
-PROJECT_HOME = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(PROJECT_HOME) 
+PROJECT_HOME = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # extract directory of PyCharm project
+sys.path.append(PROJECT_HOME)  # this line is needed to recognize the dir as a python package
 from datetime import datetime
 import re
 from joblib import Parallel, delayed
